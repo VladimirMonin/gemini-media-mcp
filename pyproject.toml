@@ -1,0 +1,38 @@
+[project]
+name = "gemini-media-mcp"
+version = "1.0.0"
+description = "MCP server for multimedia analysis using Google Gemini AI"
+authors = [
+    {name = "Vladimir", email = "your-email@example.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "mcp>=1.0.0",
+    "google-genai>=1.0.0",
+    "pillow>=10.0.0",
+    "python-dotenv>=1.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/your-username/gemini-media-mcp"
+Documentation = "https://github.com/your-username/gemini-media-mcp#readme"
+Repository = "https://github.com/your-username/gemini-media-mcp"
+Issues = "https://github.com/your-username/gemini-image-mcp/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+gemini-image-mcp = "server:main"

@@ -12,7 +12,7 @@ import sys
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger("gemini-image-mcp-server")
+logger = logging.getLogger("gemini-media-mcp-server")
 
 try:
     from mcp.server import Server, InitializationOptions, NotificationOptions
@@ -56,7 +56,7 @@ except ImportError as e:
 # genai.configure(api_key=GEMINI_API_KEY)
 
 # Инициализация MCP сервера
-server = Server("gemini-image-analyzer", version="1.0.0")
+server = Server("gemini-media-analyzer", version="1.0.0")
 
 # Инициализация модуля анализа изображений
 try:

@@ -1,112 +1,127 @@
-# Gemini Media MCP
+﻿<div align="center">
 
-MCP (Model Context Protocol) сервер для анализа мультимедийного контента (изображений, аудио, видео) с помощью Google Gemini AI. Разработан с модульной архитектурой для легкого расширения функциональности.
+#  Gemini Media MCP
 
-## Текущий функционал
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![MCP](https://img.shields.io/badge/MCP-1.0+-green.svg)](https://modelcontextprotocol.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-- **Анализ изображений**
-  - Прием изображения от пользователя (путь к файлу на локальной машине)
-  - Прием текстового запроса для анализа
-  - Гибкая настройка системных промптов:
-    - Использование предустановленных промптов
-    - Переопределение промпта через аргумент инструмента
-    - Использование промпта из файла на стороне пользователя
-  - Отдача структурированного ответа (alt-текст и детальный анализ)
-- **Поддержка моделей:** Gemini 2.5 Flash, Gemini 2.5 Pro (выбор может быть реализован разными способами, например, через конфигурацию или автоматически моделью)
-- **Работа локally** с API ключом пользователя
+**MCP server for analyzing multimedia content using Google Gemini AI**
 
-## Планы на будущее
+[English](#english)  [Русский](#русский)
 
-- Анализ аудио и видео файлов для получения текстовых расшифровок и анализа
-- Генерация изображений на основе текстовых запросов
-- Генерация аудио контента
-- Расширение модульной архитектуры для новых типов медиа
+</div>
 
-## Требования
+---
 
-- Python 3.8 или выше
-- Ключ API Google Gemini (получить можно [здесь](https://makersuite.google.com/app/apikey))
+## English
 
-## Установка и запуск
+###  About
 
-1. **Клонируйте репозиторий:**
-   ```bash
-   git clone <your-repo-url>
-   cd gemini_media_mcp
-   ```
+Model Context Protocol (MCP) server for analyzing images, audio, and video using Google Gemini AI. Built with modular architecture for easy functionality extension.
 
-2. **Создайте виртуальное окружение (рекомендуется):**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # На Windows: venv\Scripts\activate
-   ```
+###  Current Features
 
-3. **Установите зависимости:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+-  **Image Analysis** - AI-powered image descriptions
+-  **Flexible Prompts** - Custom system prompts
+-  **Multiple Models** - Gemini 2.5 Flash & Pro
+-  **Privacy First** - Runs locally with your API key
 
-4. **Настройте переменные окружения:**
-   - Создайте файл `.env` в корне проекта
-   - Добавьте в него ваш API ключ:
-     ```
-     GEMINI_API_KEY="your_gemini_api_key_here"
-     ```
+###  Documentation
 
-5. **Запустите сервер:**
-   ```bash
-   python server.py
-   ```
+**Getting Started:**
+- [ Installation Guide](docs/en/installation.md)
+- [ Configuration](docs/en/configuration.md)
+- [ Quick Start](docs/en/quick-start.md)
 
-Сервер запустится в режиме stdio, готовый к работе с MCP-клиентами.
+**Usage:**
+- [ Basic Usage](docs/en/usage.md)
+- [ Troubleshooting](docs/en/troubleshooting.md)
+- [ Common Issues](docs/en/common-issues.md)
 
-## Конфигурация
+---
 
-### Модели Gemini
+## Русский
 
-Модели, используемые для анализа, могут быть сконфигурированы в файле `config.py`. По умолчанию используются:
+###  О проекте
 
-- `gemini-2.5-flash`
-- `gemini-2.5-pro`
+MCP (Model Context Protocol) сервер для анализа изображений, аудио и видео с помощью Google Gemini AI. Модульная архитектура для лёгкого расширения функциональности.
 
-### Промпты
+###  Текущие возможности
 
-- **Предустановленные промпты:** Хранятся в `config.py` как базовые варианты.
-- **Пользовательские промпты:** Передаются непосредственно при вызове инструмента `analyze_image` через аргументы:
-  - `user_prompt`: Текстовый запрос для анализа изображения.
-  - `system_prompt`: Строка для переопределения системного промпта.
-  - `system_prompt_file_path`: Путь к файлу на локальной машине пользователя, содержащему системный промпт.
+-  **Анализ изображений** - ИИ описания изображений
+-  **Гибкие промпты** - Настраиваемые системные промпты
+-  **Несколько моделей** - Gemini 2.5 Flash и Pro
+-  **Конфиденциальность** - Работает локально с вашим ключом
 
-## Структура проекта
+###  Документация
 
-```
-gemini_media_mcp/
-├── README.MD              # Документация проекта
-├── requirements.txt       # Зависимости проекта
-├── .env.example          # Пример файла переменных окружения
-├── server.py             # Основной файл MCP сервера
-├── config.py             # Конфигурация моделей и промптов
-├── modules/              # Директория с модулями для разных типов медиа
-│   ├── __init__.py
-│   ├── image_analysis.py  # Модуль для анализа изображений
-│   └── (будущие модули: audio_analysis.py, video_analysis.py)
-└── utils/                # Вспомогательные утилиты
-    ├── __init__.py
-    ├── gemini_client.py   # Обертка для работы с Gemini API
-    └── file_utils.py      # Утилиты для работы с файлами
+**Начало работы:**
+- [ Установка](docs/ru/installation.md)
+- [ Настройка](docs/ru/configuration.md)
+- [ Быстрый старт](docs/ru/quick-start.md)
+
+**Использование:**
+- [ Базовое использование](docs/ru/usage.md)
+- [ Решение проблем](docs/ru/troubleshooting.md)
+- [ Частые ошибки](docs/ru/common-issues.md)
+
+---
+
+##  Quick Start / Быстрый старт
+
+```bash
+# Clone / Клонировать
+git clone https://github.com/your-username/gemini-media-mcp.git
+cd gemini-media-mcp
+
+# Install / Установить
+pip install -r requirements.txt
+
+# Configure / Настроить
+cp .env.example .env
+
+# Run / Запустить
+python server.py
 ```
 
-## Использование
+---
 
-Сервер предоставляет MCP инструмент `analyze_image` с следующими параметрами:
+##  Project Structure
 
-- `image_path` (string, обязательный): Путь к файлу изображения на локальной машине клиента.
-- `user_prompt` (string, опциональный): Пример: "Опиши эмоции на лицах людей в этом фото".
-- `system_prompt` (string, опциональный): Кастомный системный промпт для данной операции.
-- `system_prompt_file_path` (string, опциональный): Путь к файлу с кастомным системным промптом.
+```
+gemini-media-mcp/
+ README.md
+ docs/
+    en/
+    ru/
+ server.py
+ config.py
+ models/
+ modules/
+ utils/
+```
 
-Пример вызова с MCP клиента будет зависеть от реализации клиента. В целом, клиент должен передать эти аргументы, сервер загрузит изображение, сформирует запрос к выбранной модели Gemini и вернет структурированный ответ.
+---
 
-## Лицензия
+##  Future Plans
 
-[Укажите лицензию, если применимо]
+-  Audio and video analysis
+-  Image generation
+-  Audio generation
+
+---
+
+##  License
+
+MIT License - see [LICENSE](LICENSE)
+
+---
+
+<div align="center">
+
+**Made with  for the MCP community**
+
+[Report Bug](https://github.com/your-username/gemini-media-mcp/issues)  [Documentation](docs/en/)
+
+</div>

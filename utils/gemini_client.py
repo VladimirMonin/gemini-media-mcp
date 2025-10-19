@@ -118,23 +118,16 @@ class GeminiClient:
 
             # Проверка на наличие ошибок в ответе
             if hasattr(response, "candidates") and response.candidates:
-                # Получаем текст ответа
+                # С response_schema Gemini гарантирует чистый JSON
                 response_text = (response.text or "").strip()
 
-                # Пытаемся распарсить JSON
                 try:
-                    # Убираем markdown-обертку ```json ... ``` если есть
-                    if response_text.startswith("```json"):
-                        response_text = response_text[len("```json") :].strip()
-                    if response_text.endswith("```"):
-                        response_text = response_text[: -len("```")].strip()
-
                     result_dict = json.loads(response_text)
                     return ImageAnalysisResponse(**result_dict)
-                except json.JSONDecodeError:
-                    # Если ответ не в JSON, возвращаем как есть, но с пометкой
+                except json.JSONDecodeError as e:
                     return ErrorResponse(
-                        error="Ответ не в формате JSON",
+                        error="Ошибка парсинга JSON ответа",
+                        details=str(e),
                         raw_response=response_text,
                     )
             else:
