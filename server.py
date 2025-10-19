@@ -10,9 +10,21 @@ import logging
 import os
 import sys
 
-from utils.logger import get_logger
+# Простая настройка кодировки для Windows
+if sys.platform == "win32":
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
-logger = get_logger(__name__)
+try:
+    from utils.logger import get_logger
+
+    logger = get_logger(__name__)
+except Exception as e:
+    # Fallback если логгер не работает
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.error(f"Logger initialization failed: {e}")
+
+logger.info("Starting server import phase...")
 
 try:
     from mcp.server import Server, InitializationOptions, NotificationOptions
@@ -244,14 +256,15 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
     Returns:
         List of text content with analysis results or error messages.
     """
-    logger.info(f"Tool invoked: {name} with arguments: {arguments}")
+    safe_args = repr(arguments) if arguments else "None"
+    logger.info(f"Tool invoked: {name} with arguments: {safe_args}")
 
     if name != "analyze_image":
         error_msg = f"Unknown tool: {name}"
         logger.error(error_msg)
         return [
             TextContent(
-                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=False)
+                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=True)
             )
         ]
 
@@ -259,7 +272,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         return [
             TextContent(
                 type="text",
-                text=json.dumps({"error": "No arguments provided"}, ensure_ascii=False),
+                text=json.dumps({"error": "No arguments provided"}, ensure_ascii=True),
             )
         ]
 
@@ -270,7 +283,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
             TextContent(
                 type="text",
                 text=json.dumps(
-                    {"error": "Parameter 'image_path' is required"}, ensure_ascii=False
+                    {"error": "Parameter 'image_path' is required"}, ensure_ascii=True
                 ),
             )
         ]
@@ -281,7 +294,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
             TextContent(
                 type="text",
                 text=json.dumps(
-                    {"error": f"File not found: {image_path}"}, ensure_ascii=False
+                    {"error": f"File not found: {image_path}"}, ensure_ascii=True
                 ),
             )
         ]
@@ -294,7 +307,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
                 type="text",
                 text=json.dumps(
                     {"error": f"File is not a supported image. MIME type: {mime_type}"},
-                    ensure_ascii=False,
+                    ensure_ascii=True,
                 ),
             )
         ]
@@ -314,14 +327,15 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
             logger.error(f"Analysis error: {result['error']}")
             return [
                 TextContent(
-                    type="text", text=json.dumps(result, ensure_ascii=False, indent=2)
+                    type="text", text=json.dumps(result, indent=2, ensure_ascii=True)
                 )
             ]
 
         logger.info("Analysis completed successfully")
+        # Успешный результат тоже с ensure_ascii=True
         return [
             TextContent(
-                type="text", text=json.dumps(result, ensure_ascii=False, indent=2)
+                type="text", text=json.dumps(result, indent=2, ensure_ascii=True)
             )
         ]
 
@@ -330,7 +344,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         logger.error(error_msg)
         return [
             TextContent(
-                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=False)
+                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=True)
             )
         ]
 
@@ -339,7 +353,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         logger.error(error_msg)
         return [
             TextContent(
-                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=False)
+                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=True)
             )
         ]
 
@@ -348,7 +362,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         logger.exception(error_msg)
         return [
             TextContent(
-                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=False)
+                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=True)
             )
         ]
 

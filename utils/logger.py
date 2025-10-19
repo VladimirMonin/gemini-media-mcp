@@ -1,72 +1,71 @@
-"""Centralized logging configuration for Gemini Media MCP server.
+"""Centralized logging configuration for the MCP server.
 
-This module provides a configured logger with both file and console handlers,
-separating general logs from error logs for better diagnostics.
+Provides a unified logger with file and console output, proper formatting,
+and log rotation to prevent disk space issues.
 """
 
 import logging
-import sys
-from pathlib import Path
+import os
 from logging.handlers import RotatingFileHandler
-
-LOG_DIR = Path(__file__).parent.parent / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-
-APP_LOG_FILE = LOG_DIR / "app.log"
-ERROR_LOG_FILE = LOG_DIR / "errors.log"
-
-LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+from pathlib import Path
 
 
-def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
-    """Configure and return a logger with file and console handlers.
+def get_logger(name: str) -> logging.Logger:
+    """Get a configured logger instance.
 
     Args:
-        name: The name of the logger (typically module name).
-        level: The logging level (default: INFO).
+        name: Logger name (typically __name__ from the calling module).
 
     Returns:
-        Configured logger instance.
+        Configured logger instance with file and console handlers.
     """
     logger = logging.getLogger(name)
-    logger.setLevel(level)
-    logger.propagate = False
 
     if logger.handlers:
         return logger
 
-    formatter = logging.Formatter(LOG_FORMAT, DATE_FORMAT)
+    logger.setLevel(logging.INFO)
 
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # Create logs directory if it doesn't exist
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+
+    # Formatter for all handlers
+    formatter = logging.Formatter(
+        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     file_handler = RotatingFileHandler(
-        APP_LOG_FILE, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        log_dir / "app.log",
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5,
+        encoding="utf-8",
+        errors="replace",
     )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
 
+    # File handler for errors only
     error_handler = RotatingFileHandler(
-        ERROR_LOG_FILE, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        log_dir / "error.log",
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5,
+        encoding="utf-8",
+        errors="replace",
     )
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(formatter)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.ERROR)
+    console_handler.setFormatter(formatter)
+
+    if hasattr(console_handler.stream, "reconfigure"):
+        console_handler.stream.reconfigure(encoding="utf-8", errors="replace")
+
+    # Add all handlers to logger
+    logger.addHandler(file_handler)
     logger.addHandler(error_handler)
 
     return logger
-
-
-def get_logger(name: str) -> logging.Logger:
-    """Get or create a logger instance.
-
-    Args:
-        name: The name of the logger (use __name__ in modules).
-
-    Returns:
-        Logger instance.
-    """
-    return setup_logger(name)
