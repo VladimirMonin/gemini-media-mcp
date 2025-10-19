@@ -1,4 +1,8 @@
-# Модуль для анализа изображений
+"""Image analysis module using Google Gemini API.
+
+This module provides high-level image analysis functionality with support
+for custom system instructions and predefined analysis prompts.
+"""
 
 from typing import Any, Dict, Optional
 
@@ -9,26 +13,39 @@ from config import (
 )
 from models.analysis import ErrorResponse, ImageAnalysisResponse
 from utils.gemini_client import GeminiClient
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ImageAnalysisModule:
-    """
-    Модуль для анализа изображений с использованием Google Gemini API.
+    """High-level image analysis module using Gemini API.
+
+    Provides convenient methods for analyzing images with predefined or
+    custom system instructions.
+
+    Attributes:
+        model_name: The Gemini model being used.
+        gemini_client: The underlying Gemini API client.
     """
 
     def __init__(self, model_name: str = DEFAULT_GEMINI_MODEL):
-        """
-        Инициализация модуля.
+        """Initialize the image analysis module.
 
         Args:
-            model_name: Название модели Gemini для анализа.
+            model_name: Name of the Gemini model to use.
+
+        Raises:
+            ValueError: If the specified model is not supported.
         """
         if model_name not in GEMINI_MODELS:
+            logger.error(f"Unsupported model: {model_name}")
             raise ValueError(
-                f"Модель {model_name} не поддерживается. Доступные: {GEMINI_MODELS}"
+                f"Model {model_name} is not supported. Available: {GEMINI_MODELS}"
             )
         self.model_name = model_name
         self.gemini_client = GeminiClient(model_name=model_name)
+        logger.info(f"ImageAnalysisModule initialized with model: {model_name}")
 
     def analyze(
         self,
@@ -38,103 +55,63 @@ class ImageAnalysisModule:
         system_instruction_override: Optional[str] = None,
         system_instruction_file_path: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Анализирует изображение.
+        """Analyze an image with configurable system instructions.
 
         Args:
-            image_path: Путь к файлу изображения.
-            user_prompt: Пользовательский запрос для анализа.
-            system_instruction_name: Имя предустановленной системной инструкции из AVAILABLE_IMAGE_ANALYSIS_PROMPTS.
-            system_instruction_override: Строка для переопределения системной инструкции.
-            system_instruction_file_path: Путь к файлу с системной инструкцией.
+            image_path: Path to the image file.
+            user_prompt: User's analysis prompt.
+            system_instruction_name: Name of predefined prompt from config.
+            system_instruction_override: Custom system instruction string.
+            system_instruction_file_path: Path to file with system instruction.
 
         Returns:
-            Словарь с результатом анализа или информацией об ошибке.
+            Dictionary with analysis results or error information.
         """
         final_system_instruction = None
 
-        # 1. Проверяем, не переопределена ли системная инструкция через файл
         if system_instruction_file_path:
             try:
                 with open(system_instruction_file_path, "r", encoding="utf-8") as f:
                     final_system_instruction = f.read()
+                logger.debug(
+                    f"Loaded system instruction from file: {system_instruction_file_path}"
+                )
             except FileNotFoundError:
+                logger.error(
+                    f"System instruction file not found: {system_instruction_file_path}"
+                )
                 return {
-                    "error": f"Файл системной инструкции не найден: {system_instruction_file_path}"
+                    "error": f"System instruction file not found: {system_instruction_file_path}"
                 }
             except IOError as e:
-                return {"error": f"Ошибка чтения файла системной инструкции: {e}"}
-        # 2. Если нет файла, проверяем override
+                logger.error(f"Error reading system instruction file: {e}")
+                return {"error": f"Error reading system instruction file: {e}"}
         elif system_instruction_override:
             final_system_instruction = system_instruction_override
-        # 3. Если нет override, используем предустановленную по имени
+            logger.debug("Using custom system instruction override")
         elif system_instruction_name:
             if system_instruction_name in AVAILABLE_IMAGE_ANALYSIS_PROMPTS:
                 final_system_instruction = AVAILABLE_IMAGE_ANALYSIS_PROMPTS[
                     system_instruction_name
                 ]
+                logger.debug(f"Using predefined prompt: {system_instruction_name}")
             else:
+                available = list(AVAILABLE_IMAGE_ANALYSIS_PROMPTS.keys())
+                logger.error(f"Unknown prompt name: {system_instruction_name}")
                 return {
-                    "error": f"Предустановленный промпт '{system_instruction_name}' не найден. Доступные: {list(AVAILABLE_IMAGE_ANALYSIS_PROMPTS.keys())}"
+                    "error": f"Prompt '{system_instruction_name}' not found. Available: {available}"
                 }
-
-        # Если ничего не выбрано, используется системная инструкция, встроенная в модель (если есть)
-        # или стандартная, которая может быть частью промпта в `contents` в `GeminiClient`
 
         result = self.gemini_client.analyze_image(
             image_path=image_path,
             user_prompt=user_prompt,
-            system_instruction_override=final_system_instruction,  # Передаем сюда собранную инструкцию
+            system_instruction_override=final_system_instruction,
         )
 
         if isinstance(result, ImageAnalysisResponse):
             return result.model_dump()
         if isinstance(result, ErrorResponse):
             return result.model_dump()
-        # fallback на случай непредвиденного типа
-        return {"error": "Неожиданный формат ответа от Gemini"}
 
-
-# Пример использования (для тестирования)
-if __name__ == "__main__":
-    try:
-        # Убедись, что GEMINI_API_KEY настроен в .env
-        # И что у вас есть файл test_image.jpg в той же директории
-
-        module = ImageAnalysisModule()
-
-        # Пример с предустановленным промптом "default"
-        # result = module.analyze(
-        #     image_path="test_image.jpg", # Замени на путь к твоему изображению
-        #     user_prompt="Опиши, что на этом изображении.",
-        #     system_instruction_name="default"
-        # )
-        # print("Результат анализа (default промпт):")
-        # print(result)
-
-        # Пример с техническим промптом
-        # result_technical = module.analyze(
-        #     image_path="test_image.jpg", # Замени на путь к твоему изображению
-        #     user_prompt="Проанализируй дизайн изображения.",
-        #     system_instruction_name="technical"
-        # )
-        # print("\nРезультат анализа (технический промпт):")
-        # print(result_technical)
-
-        # Пример с кастомным промптом через override
-        # custom_prompt = "Ты — искусствовед. Опиши стиль и художественные особенности этого изображения."
-        # result_custom = module.analyze(
-        #     image_path="test_image.jpg", # Замени на путь к твоему изображению
-        #     user_prompt="Расскажи об этом произведении искусства.",
-        #     system_instruction_override=custom_prompt
-        # )
-        # print("\nРезультат анализа (кастомный промпт):")
-        # print(result_custom)
-
-        print("ImageAnalysisModule инициализирован. Примеры закомментированы.")
-        print("Чтобы протестировать, раскомментируй и укажи путь к изображению.")
-
-    except ValueError as e:
-        print(f"Ошибка конфигурации: {e}")
-    except Exception as e:
-        print(f"Произошла ошибка: {e}")
+        logger.error("Unexpected response format from Gemini")
+        return {"error": "Unexpected response format from Gemini"}

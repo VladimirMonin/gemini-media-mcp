@@ -1,5 +1,7 @@
-"""
-MCP Сервер для анализа изображений с использованием Google Gemini API.
+"""MCP server for image analysis using Google Gemini API.
+
+This server provides Model Context Protocol tools and prompts for analyzing
+images with Google's Gemini AI models.
 """
 
 import asyncio
@@ -8,11 +10,9 @@ import logging
 import os
 import sys
 
-# Установка корневого логгера для MCP
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("gemini-media-mcp-server")
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 try:
     from mcp.server import Server, InitializationOptions, NotificationOptions
@@ -27,10 +27,8 @@ try:
         LoggingLevel,
     )
 except ImportError as e:
-    logger.error(
-        f"Критическая ошибка импорта MCP: {e}. Убедитесь, что все зависимости из requirements.txt установлены в виртуальном окружении."
-    )
-    logger.error("Попробуйте: pip install -r requirements.txt")
+    logger.error(f"Critical MCP import error: {e}")
+    logger.error("Try: pip install -r requirements.txt")
     sys.exit(1)
 
 try:
@@ -46,51 +44,47 @@ try:
         SUPPORTED_IMAGE_MIME_TYPES,
     )
 except ImportError as e:
-    logger.error(
-        f"Ошибка импорта локальных модулей: {e}. Убедитесь, что структура проекта корректна."
-    )
+    logger.error(f"Local module import error: {e}")
     sys.exit(1)
 
-# Инициализация Gemini SDK
-# Конфигурация теперь выполняется внутри GeminiClient при его создании
-# genai.configure(api_key=GEMINI_API_KEY)
-
-# Инициализация MCP сервера
 server = Server("gemini-media-analyzer", version="1.0.0")
 
-# Инициализация модуля анализа изображений
 try:
     image_analyzer = ImageAnalysisModule(model_name=DEFAULT_GEMINI_MODEL)
-    logger.info(
-        f"Модуль анализа изображений инициализирован с моделью {DEFAULT_GEMINI_MODEL}"
-    )
+    logger.info(f"Image analysis module initialized with model: {DEFAULT_GEMINI_MODEL}")
 except ValueError as e:
-    logger.error(f"Ошибка инициализации ImageAnalysisModule: {e}")
+    logger.error(f"ImageAnalysisModule initialization error: {e}")
     if GEMINI_MODELS:
-        logger.info(
-            f"Попытка инициализации с альтернативной моделью: {GEMINI_MODELS[0]}"
-        )
+        logger.info(f"Attempting fallback to model: {GEMINI_MODELS[0]}")
         image_analyzer = ImageAnalysisModule(model_name=GEMINI_MODELS[0])
     else:
-        logger.error("Не удалось найти альтернативную модель.")
+        logger.error("No alternative model found")
         sys.exit(1)
-except Exception as e:  # Общий случай, если что-то пошло не так
-    logger.error(f"Неизвестная ошибка при инициализации ImageAnalysisModule: {e}")
+except Exception as e:
+    logger.exception(f"Unknown error during ImageAnalysisModule initialization: {e}")
     sys.exit(1)
 
 
 @server.list_tools()
 async def handle_list_tools() -> list[Tool]:
-    """Список доступных инструментов."""
-    logger.info("Запрос списка инструментов")
+    """List available MCP tools.
+
+    Returns:
+        List of available tools for image analysis.
+    """
+    logger.info("Tools list requested")
+
+    supported_formats = ", ".join(
+        [mt.split("/")[-1].upper() for mt in SUPPORTED_IMAGE_MIME_TYPES]
+    )
 
     return [
         Tool(
             name="analyze_image",
             description=(
-                "Анализирует изображение с помощью Google Gemini API. "
-                "Возвращает структурированный результат с alt-текстом и детальным описанием. "
-                f"Поддерживаемые форматы: {', '.join([mt.split('/')[-1].upper() for mt in SUPPORTED_IMAGE_MIME_TYPES])}"
+                f"Analyze images using Google Gemini API. "
+                f"Returns structured result with alt-text and detailed analysis. "
+                f"Supported formats: {supported_formats}"
             ),
             inputSchema={
                 "$schema": "http://json-schema.org/draft-07/schema#",
@@ -98,30 +92,30 @@ async def handle_list_tools() -> list[Tool]:
                 "properties": {
                     "image_path": {
                         "type": "string",
-                        "description": "Абсолютный путь к файлу изображения на локальной машине",
+                        "description": "Absolute path to the image file on local machine",
                         "minLength": 1,
                         "pattern": r"^.+\.(jpg|jpeg|png|gif|webp|bmp)$",
                     },
                     "user_prompt": {
                         "type": "string",
-                        "description": "Пользовательский запрос для анализа изображения (опционально)",
+                        "description": "Custom analysis request (optional)",
                         "maxLength": 2000,
                         "default": "",
                     },
                     "system_instruction_name": {
                         "type": "string",
-                        "description": "Имя предустановленной системной инструкции",
+                        "description": "Name of predefined system instruction",
                         "enum": list(AVAILABLE_IMAGE_ANALYSIS_PROMPTS.keys()),
                         "default": "default",
                     },
                     "system_instruction_override": {
                         "type": "string",
-                        "description": "Кастомная системная инструкция (переопределяет system_instruction_name)",
+                        "description": "Custom system instruction (overrides system_instruction_name)",
                         "maxLength": 5000,
                     },
                     "system_instruction_file_path": {
                         "type": "string",
-                        "description": "Путь к файлу с системной инструкцией (наивысший приоритет)",
+                        "description": "Path to file with system instruction (highest priority)",
                     },
                 },
                 "required": ["image_path"],
@@ -133,33 +127,35 @@ async def handle_list_tools() -> list[Tool]:
 
 @server.list_prompts()
 async def handle_list_prompts() -> list[Prompt]:
-    """Список доступных промптов для анализа изображений."""
-    logger.info("Запрос списка промптов")
+    """List available prompts for image analysis.
+
+    Returns:
+        List of prompts, one for each predefined system instruction.
+    """
+    logger.info("Prompts list requested")
 
     prompts = []
-
-    # Создаем промпт для каждой предустановленной системной инструкции
     for name, instruction in AVAILABLE_IMAGE_ANALYSIS_PROMPTS.items():
         prompts.append(
             Prompt(
                 name=f"analyze_{name}",
-                description=f"Анализ изображения с использованием {name} промпта: {instruction[:100]}...",
+                description=f"Analyze image using {name} prompt: {instruction[:100]}...",
                 arguments=[
                     PromptArgument(
                         name="image_path",
-                        description="Абсолютный путь к файлу изображения",
+                        description="Absolute path to image file",
                         required=True,
                     ),
                     PromptArgument(
                         name="user_prompt",
-                        description="Дополнительный запрос для анализа (опционально)",
+                        description="Additional analysis request (optional)",
                         required=False,
                     ),
                 ],
             )
         )
 
-    logger.info(f"Возвращено {len(prompts)} промптов")
+    logger.info(f"Returning {len(prompts)} prompts")
     return prompts
 
 
@@ -167,37 +163,43 @@ async def handle_list_prompts() -> list[Prompt]:
 async def handle_get_prompt(
     name: str, arguments: dict[str, str] | None
 ) -> GetPromptResult:
-    """Получение конкретного промпта."""
-    logger.info(f"Запрос промпта: {name}")
+    """Get a specific prompt by name.
 
-    # Извлекаем имя системной инструкции из имени промпта
-    # Например: "analyze_default" -> "default"
+    Args:
+        name: Prompt name (e.g., "analyze_default").
+        arguments: Prompt arguments including image_path and optional user_prompt.
+
+    Returns:
+        Formatted prompt result.
+
+    Raises:
+        ValueError: If prompt name is invalid or required arguments are missing.
+    """
+    logger.info(f"Prompt requested: {name}")
+
     if not name.startswith("analyze_"):
-        raise ValueError(f"Неизвестный промпт: {name}")
+        raise ValueError(f"Unknown prompt: {name}")
 
     instruction_name = name.replace("analyze_", "")
 
     if instruction_name not in AVAILABLE_IMAGE_ANALYSIS_PROMPTS:
-        raise ValueError(f"Неизвестная системная инструкция: {instruction_name}")
+        raise ValueError(f"Unknown system instruction: {instruction_name}")
 
-    # Получаем аргументы
     image_path = arguments.get("image_path") if arguments else ""
     user_prompt = arguments.get("user_prompt", "") if arguments else ""
 
     if not image_path:
-        raise ValueError("Аргумент 'image_path' обязателен")
+        raise ValueError("Argument 'image_path' is required")
 
-    # Формируем системную инструкцию
     system_instruction = AVAILABLE_IMAGE_ANALYSIS_PROMPTS[instruction_name]
 
-    # Формируем финальный промпт
     final_prompt = f"{system_instruction}\n\n"
     if user_prompt:
-        final_prompt += f"Запрос пользователя: {user_prompt}\n\n"
-    final_prompt += f"Проанализируй изображение: {image_path}"
+        final_prompt += f"User request: {user_prompt}\n\n"
+    final_prompt += f"Analyze this image: {image_path}"
 
     return GetPromptResult(
-        description=f"Анализ изображения с {instruction_name} промптом",
+        description=f"Image analysis using {instruction_name} prompt",
         messages=[
             PromptMessage(
                 role="user",
@@ -212,10 +214,13 @@ async def handle_get_prompt(
 
 @server.set_logging_level()
 async def handle_set_logging_level(level: LoggingLevel) -> None:
-    """Установка уровня логирования."""
-    logger.info(f"Изменение уровня логирования на: {level}")
+    """Set logging level.
 
-    # Преобразуем LoggingLevel в уровень logging
+    Args:
+        level: The logging level to set (debug, info, warning, error, critical).
+    """
+    logger.info(f"Changing logging level to: {level}")
+
     level_map = {
         "debug": logging.DEBUG,
         "info": logging.INFO,
@@ -230,11 +235,19 @@ async def handle_set_logging_level(level: LoggingLevel) -> None:
 
 @server.call_tool()
 async def handle_call_tool(name: str, arguments: dict | None) -> list[TextContent]:
-    """Обработка вызова инструмента."""
-    logger.info(f"Вызов инструмента: {name} с аргументами: {arguments}")
+    """Handle tool invocation.
+
+    Args:
+        name: Tool name to invoke.
+        arguments: Tool arguments.
+
+    Returns:
+        List of text content with analysis results or error messages.
+    """
+    logger.info(f"Tool invoked: {name} with arguments: {arguments}")
 
     if name != "analyze_image":
-        error_msg = f"Неизвестный инструмент: {name}"
+        error_msg = f"Unknown tool: {name}"
         logger.error(error_msg)
         return [
             TextContent(
@@ -242,60 +255,52 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
             )
         ]
 
-    # Валидация аргументов
     if arguments is None:
         return [
             TextContent(
                 type="text",
-                text=json.dumps(
-                    {"error": "Аргументы не предоставлены"}, ensure_ascii=False
-                ),
+                text=json.dumps({"error": "No arguments provided"}, ensure_ascii=False),
             )
         ]
 
     image_path = arguments.get("image_path", "").strip()
     if not image_path:
-        logger.error("Параметр 'image_path' отсутствует")
+        logger.error("Parameter 'image_path' is missing")
         return [
             TextContent(
                 type="text",
                 text=json.dumps(
-                    {"error": "Параметр 'image_path' обязателен"}, ensure_ascii=False
+                    {"error": "Parameter 'image_path' is required"}, ensure_ascii=False
                 ),
             )
         ]
 
-    # Проверка существования файла
     if not os.path.exists(image_path):
-        logger.error(f"Файл не найден: {image_path}")
+        logger.error(f"File not found: {image_path}")
         return [
             TextContent(
                 type="text",
                 text=json.dumps(
-                    {"error": f"Файл не найден: {image_path}"}, ensure_ascii=False
+                    {"error": f"File not found: {image_path}"}, ensure_ascii=False
                 ),
             )
         ]
 
-    # Проверка валидности изображения
     if not is_image_valid(image_path):
         mime_type = get_file_mime_type(image_path)
-        logger.error(f"Неверный формат файла: {mime_type}")
+        logger.error(f"Invalid file format: {mime_type}")
         return [
             TextContent(
                 type="text",
                 text=json.dumps(
-                    {
-                        "error": f"Файл не является поддерживаемым изображением. MIME тип: {mime_type}"
-                    },
+                    {"error": f"File is not a supported image. MIME type: {mime_type}"},
                     ensure_ascii=False,
                 ),
             )
         ]
 
-    # Анализ изображения
     try:
-        logger.info(f"Начало анализа изображения: {image_path}")
+        logger.info(f"Starting image analysis: {image_path}")
 
         result = image_analyzer.analyze(
             image_path=image_path,
@@ -305,16 +310,15 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
             system_instruction_file_path=arguments.get("system_instruction_file_path"),
         )
 
-        # Если есть ошибка в результате
         if "error" in result:
-            logger.error(f"Ошибка анализа: {result['error']}")
+            logger.error(f"Analysis error: {result['error']}")
             return [
                 TextContent(
                     type="text", text=json.dumps(result, ensure_ascii=False, indent=2)
                 )
             ]
 
-        logger.info("Анализ успешно завершен")
+        logger.info("Analysis completed successfully")
         return [
             TextContent(
                 type="text", text=json.dumps(result, ensure_ascii=False, indent=2)
@@ -322,7 +326,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         ]
 
     except FileNotFoundError as e:
-        error_msg = f"Файл не найден во время анализа: {e}"
+        error_msg = f"File not found during analysis: {e}"
         logger.error(error_msg)
         return [
             TextContent(
@@ -331,7 +335,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         ]
 
     except IOError as e:
-        error_msg = f"Ошибка ввода-вывода: {e}"
+        error_msg = f"I/O error: {e}"
         logger.error(error_msg)
         return [
             TextContent(
@@ -340,8 +344,8 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         ]
 
     except Exception as e:
-        error_msg = f"Неожиданная ошибка при анализе: {e}"
-        logger.error(error_msg, exc_info=True)
+        error_msg = f"Unexpected error during analysis: {e}"
+        logger.exception(error_msg)
         return [
             TextContent(
                 type="text", text=json.dumps({"error": error_msg}, ensure_ascii=False)
@@ -350,14 +354,14 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
 
 
 async def main():
-    """Главная функция запуска сервера."""
-    logger.info("Запуск Gemini Image Analyzer MCP сервера...")
+    """Run the MCP server main loop."""
+    logger.info("Starting Gemini Image Analyzer MCP server...")
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream,
             write_stream,
             InitializationOptions(
-                server_name="gemini-image-mcp-server",
+                server_name="gemini-media-mcp",
                 server_version="1.0.0",
                 capabilities=server.get_capabilities(
                     notification_options=NotificationOptions(),
@@ -371,7 +375,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Сервер остановлен пользователем (KeyboardInterrupt).")
+        logger.info("Server stopped by user (KeyboardInterrupt)")
     except Exception as e:
-        logger.error(f"Критическая ошибка при запуске сервера: {e}", exc_info=True)
+        logger.exception(f"Critical error during server startup: {e}")
         sys.exit(1)

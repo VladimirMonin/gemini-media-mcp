@@ -1,57 +1,80 @@
-# Утилиты для работы с файлами
+"""File handling utilities for image validation and MIME type detection.
+
+This module provides utilities for working with image files, including
+MIME type detection, file validation, and binary file reading operations.
+"""
 
 import mimetypes
 import os
 from pathlib import Path
 from typing import List
 
-# Поддерживаемые MIME типы изображений для анализа
 SUPPORTED_IMAGE_MIME_TYPES: List[str] = [
     "image/jpeg",
     "image/png",
     "image/gif",
     "image/webp",
-    # Добавить другие форматы по необходимости, которые поддерживает генеративная модель
 ]
 
+
 def get_file_mime_type(file_path: str) -> str | None:
-    """
-    Определяет MIME тип файла.
+    """Detect MIME type of a file.
+
+    Attempts to determine MIME type using mimetypes library,
+    with fallback to extension-based detection.
+
+    Args:
+        file_path: Path to the file to analyze.
+
+    Returns:
+        MIME type string, or 'application/octet-stream' for unknown types.
     """
     mime_type, _ = mimetypes.guess_type(file_path)
     if mime_type:
         return mime_type
-    
-    # Fallback для неизвестных типов, предполагаем binary
-    # Или можно попробовать определить по расширению более явно
+
     file_extension = Path(file_path).suffix.lower()
-    if file_extension == ".jpg" or file_extension == ".jpeg":
-        return "image/jpeg"
-    elif file_extension == ".png":
-        return "image/png"
-    elif file_extension == ".gif":
-        return "image/gif"
-    elif file_extension == ".webp":
-        return "image/webp"
-    # Добавить другие форматы по необходимости
-    
-    return "application/octet-stream" # Тип по умолчанию для binary
+    extension_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }
+
+    return extension_map.get(file_extension, "application/octet-stream")
+
 
 def read_file_as_bytes(file_path: str) -> bytes:
-    """
-    Читает файл и возвращает его содержимое в виде байтов.
+    """Read file contents as bytes.
+
+    Args:
+        file_path: Path to the file to read.
+
+    Returns:
+        File contents as bytes.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        IOError: If an error occurs during file reading.
     """
     try:
         with open(file_path, "rb") as f:
             return f.read()
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Файл не найден: {file_path}")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"File not found: {file_path}") from exc
     except IOError as e:
-        raise IOError(f"Ошибка при чтении файла {file_path}: {e}")
+        raise IOError(f"Error reading file {file_path}: {e}") from e
+
 
 def is_image_valid(file_path: str) -> bool:
-    """
-    Проверяет, является ли файл изображением и поддерживается ли его тип.
+    """Validate if a file is a supported image type.
+
+    Args:
+        file_path: Path to the file to validate.
+
+    Returns:
+        True if the file exists and is a supported image type, False otherwise.
     """
     if not os.path.exists(file_path):
         return False

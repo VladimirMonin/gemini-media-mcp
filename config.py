@@ -1,57 +1,55 @@
-# Конфигурация Gemini Media MCP
+"""Configuration module for Gemini Media MCP server.
+
+This module loads environment variables and defines default prompts
+and model configurations for the image analysis service.
+"""
 
 import os
 from dotenv import load_dotenv
 
-# Загрузка переменных окружения из .env файла
 load_dotenv()
 
-# --- API Ключи ---
 GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY не найден в переменных окружения. "
-                     "Пожалуйста, создайте .env файл и добавьте GEMINI_API_KEY='ваш_ключ'")
+    raise ValueError(
+        "GEMINI_API_KEY not found in environment variables. "
+        "Please create a .env file with GEMINI_API_KEY='your_key'"
+    )
 
-# --- Модели Gemini ---
 GEMINI_MODELS = [
     "gemini-2.5-flash",
     "gemini-2.5-pro",
 ]
-DEFAULT_GEMINI_MODEL: str = GEMINI_MODELS[0]  # Используем flash по умолчанию
+DEFAULT_GEMINI_MODEL: str = GEMINI_MODELS[0]
 
-# --- Промпты для анализа изображений ---
-
-# Стандартный системный промпт
 DEFAULT_IMAGE_ANALYSIS_SYSTEM_PROMPT: str = """
-Ты — эксперт по анализу изображений. Твоя задача — предоставлять точные и подробные описания изображений на основе запроса пользователя.
+You are an expert image analyst. Your task is to provide accurate and detailed image descriptions based on user requests.
 
-Ты должен ответить в следующем формате JSON:
+You must respond in the following JSON format:
 ```json
 {
-  "alt_text": "Краткое и информативное описание изображения, подходящее для альтернативного текста (accessibility).",
-  "detailed_analysis": "Подробный анализ изображения, основанный на запросе пользователя. Опиши все значимые элементы, цвета, композицию, объекты и действия на изображении."
+  "alt_text": "Brief, informative image description suitable for accessibility alt-text.",
+  "detailed_analysis": "Comprehensive image analysis based on the user's request. Describe all significant elements, colors, composition, objects, and actions in the image."
 }
 ```
 
-Убедись, что ответ валиден в формате JSON.
+Ensure your response is valid JSON.
 """
 
-# Технический промпт (например, для анализа с точки зрения дизайна, данных и т.д.)
 TECHNICAL_IMAGE_ANALYSIS_SYSTEM_PROMPT: str = """
-Ты — технический аналитик изображений. Проанализируй изображение с технической точки зрения: композиция, использование цвета, типографика (если есть), общая эстетика, потенциальные области применения и т.д.
+You are a technical image analyst. Analyze the image from a technical perspective: composition, color usage, typography (if present), overall aesthetics, potential use cases, etc.
 
-Ответ в формате JSON:
+Respond in JSON format:
 ```json
 {
-  "alt_text": "Краткое техническое описание изображения.",
-  "detailed_analysis": "Детальный технический анализ, включая стилистические выборы, возможные инструменты создания, целевую аудиторию."
+  "alt_text": "Brief technical image description.",
+  "detailed_analysis": "Detailed technical analysis including stylistic choices, potential creation tools, target audience."
 }
 ```
 
-Убедись, что ответ валиден в формате JSON.
+Ensure your response is valid JSON.
 """
 
-# Сопоставление имен промптов и их содержимого
 AVAILABLE_IMAGE_ANALYSIS_PROMPTS = {
     "default": DEFAULT_IMAGE_ANALYSIS_SYSTEM_PROMPT,
     "technical": TECHNICAL_IMAGE_ANALYSIS_SYSTEM_PROMPT,
