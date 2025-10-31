@@ -1,11 +1,10 @@
 """MCP server for image analysis using Google Gemini API.
 
-This server provides Model Context Protocol tools and prompts for analyzing
-images with Google's Gemini AI models.
+This server provides Model Context Protocol tools for analyzing
+images with Google's Gemini AI models using FastMCP.
 """
 
 import asyncio
-import json
 import logging
 import os
 import sys
@@ -27,17 +26,7 @@ except Exception as e:
 logger.info("Starting server import phase...")
 
 try:
-    from mcp.server import Server, InitializationOptions, NotificationOptions
-    from mcp.server.stdio import stdio_server
-    from mcp.types import (
-        TextContent,
-        Tool,
-        Prompt,
-        PromptArgument,
-        PromptMessage,
-        GetPromptResult,
-        LoggingLevel,
-    )
+    from mcp.server.fastmcp import FastMCP
 except ImportError as e:
     logger.error(f"Critical MCP import error: {e}")
     logger.error("Try: pip install -r requirements.txt")
@@ -49,345 +38,134 @@ try:
         DEFAULT_GEMINI_MODEL,
         AVAILABLE_IMAGE_ANALYSIS_PROMPTS,
     )
-    from modules.image_analysis import ImageAnalysisModule
-    from utils.file_utils import (
-        get_file_mime_type,
-        is_image_valid,
-        SUPPORTED_IMAGE_MIME_TYPES,
-    )
+    from models.analysis import ImageAnalysisResponse, ErrorResponse
+    from utils.gemini_client import GeminiClient
+    from utils.file_utils import is_image_valid
 except ImportError as e:
     logger.error(f"Local module import error: {e}")
     sys.exit(1)
 
-server = Server("gemini-media-analyzer", version="1.0.0")
+# Инициализация FastMCP сервера
+mcp = FastMCP("gemini-media-analyzer")
 
+# Инициализация клиента Gemini
 try:
-    image_analyzer = ImageAnalysisModule(model_name=DEFAULT_GEMINI_MODEL)
-    logger.info(f"Image analysis module initialized with model: {DEFAULT_GEMINI_MODEL}")
+    gemini_client = GeminiClient(model_name=DEFAULT_GEMINI_MODEL)
+    logger.info(f"Gemini client initialized with model: {DEFAULT_GEMINI_MODEL}")
 except ValueError as e:
-    logger.error(f"ImageAnalysisModule initialization error: {e}")
+    logger.error(f"GeminiClient initialization error: {e}")
     if GEMINI_MODELS:
         logger.info(f"Attempting fallback to model: {GEMINI_MODELS[0]}")
-        image_analyzer = ImageAnalysisModule(model_name=GEMINI_MODELS[0])
+        gemini_client = GeminiClient(model_name=GEMINI_MODELS[0])
     else:
         logger.error("No alternative model found")
         sys.exit(1)
 except Exception as e:
-    logger.exception(f"Unknown error during ImageAnalysisModule initialization: {e}")
+    logger.exception(f"Unknown error during GeminiClient initialization: {e}")
     sys.exit(1)
 
 
-@server.list_tools()
-async def handle_list_tools() -> list[Tool]:
-    """List available MCP tools.
-
-    Returns:
-        List of available tools for image analysis.
-    """
-    logger.info("Tools list requested")
-
-    supported_formats = ", ".join(
-        [mt.split("/")[-1].upper() for mt in SUPPORTED_IMAGE_MIME_TYPES]
-    )
-
-    return [
-        Tool(
-            name="analyze_image",
-            description=(
-                f"Analyze images using Google Gemini API. "
-                f"Returns structured result with alt-text and detailed analysis. "
-                f"Supported formats: {supported_formats}"
-            ),
-            inputSchema={
-                "$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "properties": {
-                    "image_path": {
-                        "type": "string",
-                        "description": "Absolute path to the image file on local machine",
-                        "minLength": 1,
-                        "pattern": r"^.+\.(jpg|jpeg|png|gif|webp|bmp)$",
-                    },
-                    "user_prompt": {
-                        "type": "string",
-                        "description": "Custom analysis request (optional)",
-                        "maxLength": 2000,
-                        "default": "",
-                    },
-                    "system_instruction_name": {
-                        "type": "string",
-                        "description": "Name of predefined system instruction",
-                        "enum": list(AVAILABLE_IMAGE_ANALYSIS_PROMPTS.keys()),
-                        "default": "default",
-                    },
-                    "system_instruction_override": {
-                        "type": "string",
-                        "description": "Custom system instruction (overrides system_instruction_name)",
-                        "maxLength": 5000,
-                    },
-                    "system_instruction_file_path": {
-                        "type": "string",
-                        "description": "Path to file with system instruction (highest priority)",
-                    },
-                },
-                "required": ["image_path"],
-                "additionalProperties": False,
-            },
-        )
-    ]
-
-
-@server.list_prompts()
-async def handle_list_prompts() -> list[Prompt]:
-    """List available prompts for image analysis.
-
-    Returns:
-        List of prompts, one for each predefined system instruction.
-    """
-    logger.info("Prompts list requested")
-
-    prompts = []
-    for name, instruction in AVAILABLE_IMAGE_ANALYSIS_PROMPTS.items():
-        prompts.append(
-            Prompt(
-                name=f"analyze_{name}",
-                description=f"Analyze image using {name} prompt: {instruction[:100]}...",
-                arguments=[
-                    PromptArgument(
-                        name="image_path",
-                        description="Absolute path to image file",
-                        required=True,
-                    ),
-                    PromptArgument(
-                        name="user_prompt",
-                        description="Additional analysis request (optional)",
-                        required=False,
-                    ),
-                ],
-            )
-        )
-
-    logger.info(f"Returning {len(prompts)} prompts")
-    return prompts
-
-
-@server.get_prompt()
-async def handle_get_prompt(
-    name: str, arguments: dict[str, str] | None
-) -> GetPromptResult:
-    """Get a specific prompt by name.
-
+def get_system_instruction(
+    name: str = "default",
+    override: str | None = None,
+    file_path: str | None = None
+) -> str | None:
+    """Get system instruction with priority handling.
+    
+    Priority order:
+    1. File path (highest priority)
+    2. Custom override
+    3. Predefined instruction by name
+    
     Args:
-        name: Prompt name (e.g., "analyze_default").
-        arguments: Prompt arguments including image_path and optional user_prompt.
-
+        name: Name of predefined system instruction.
+        override: Custom system instruction string.
+        file_path: Path to file with system instruction.
+        
     Returns:
-        Formatted prompt result.
-
+        System instruction string or None if not found.
+        
     Raises:
-        ValueError: If prompt name is invalid or required arguments are missing.
+        FileNotFoundError: If system instruction file not found.
+        IOError: If error reading system instruction file.
     """
-    logger.info(f"Prompt requested: {name}")
-
-    if not name.startswith("analyze_"):
-        raise ValueError(f"Unknown prompt: {name}")
-
-    instruction_name = name.replace("analyze_", "")
-
-    if instruction_name not in AVAILABLE_IMAGE_ANALYSIS_PROMPTS:
-        raise ValueError(f"Unknown system instruction: {instruction_name}")
-
-    image_path = arguments.get("image_path") if arguments else ""
-    user_prompt = arguments.get("user_prompt", "") if arguments else ""
-
-    if not image_path:
-        raise ValueError("Argument 'image_path' is required")
-
-    system_instruction = AVAILABLE_IMAGE_ANALYSIS_PROMPTS[instruction_name]
-
-    final_prompt = f"{system_instruction}\n\n"
-    if user_prompt:
-        final_prompt += f"User request: {user_prompt}\n\n"
-    final_prompt += f"Analyze this image: {image_path}"
-
-    return GetPromptResult(
-        description=f"Image analysis using {instruction_name} prompt",
-        messages=[
-            PromptMessage(
-                role="user",
-                content=TextContent(
-                    type="text",
-                    text=final_prompt,
-                ),
-            )
-        ],
-    )
+    if file_path:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read()
+    if override:
+        return override
+    return AVAILABLE_IMAGE_ANALYSIS_PROMPTS.get(name)
 
 
-@server.set_logging_level()
-async def handle_set_logging_level(level: LoggingLevel) -> None:
-    """Set logging level.
-
+@mcp.tool()
+def analyze_image(
+    image_path: str,
+    user_prompt: str = "",
+    system_instruction_name: str = "default",
+    system_instruction_override: str | None = None,
+    system_instruction_file_path: str | None = None
+) -> ImageAnalysisResponse | ErrorResponse:
+    """Analyze images using Google Gemini API.
+    
+    Returns structured result with alt-text and detailed analysis.
+    Supported formats: JPEG, PNG, GIF, WEBP, BMP
+    
     Args:
-        level: The logging level to set (debug, info, warning, error, critical).
-    """
-    logger.info(f"Changing logging level to: {level}")
-
-    level_map = {
-        "debug": logging.DEBUG,
-        "info": logging.INFO,
-        "warning": logging.WARNING,
-        "error": logging.ERROR,
-        "critical": logging.CRITICAL,
-    }
-
-    log_level = level_map.get(level.lower(), logging.INFO)
-    logger.setLevel(log_level)
-
-
-@server.call_tool()
-async def handle_call_tool(name: str, arguments: dict | None) -> list[TextContent]:
-    """Handle tool invocation.
-
-    Args:
-        name: Tool name to invoke.
-        arguments: Tool arguments.
-
+        image_path: Absolute path to the image file on local machine.
+        user_prompt: Custom analysis request (optional).
+        system_instruction_name: Name of predefined system instruction.
+        system_instruction_override: Custom system instruction (overrides system_instruction_name).
+        system_instruction_file_path: Path to file with system instruction (highest priority).
+        
     Returns:
-        List of text content with analysis results or error messages.
+        Structured analysis response with alt-text and detailed analysis.
+        
+    Raises:
+        ValueError: If image is invalid or system instruction not found.
+        FileNotFoundError: If image file or system instruction file not found.
+        IOError: If error reading files.
     """
-    safe_args = repr(arguments) if arguments else "None"
-    logger.info(f"Tool invoked: {name} with arguments: {safe_args}")
-
-    if name != "analyze_image":
-        error_msg = f"Unknown tool: {name}"
-        logger.error(error_msg)
-        return [
-            TextContent(
-                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=True)
-            )
-        ]
-
-    if arguments is None:
-        return [
-            TextContent(
-                type="text",
-                text=json.dumps({"error": "No arguments provided"}, ensure_ascii=True),
-            )
-        ]
-
-    image_path = arguments.get("image_path", "").strip()
-    if not image_path:
-        logger.error("Parameter 'image_path' is missing")
-        return [
-            TextContent(
-                type="text",
-                text=json.dumps(
-                    {"error": "Parameter 'image_path' is required"}, ensure_ascii=True
-                ),
-            )
-        ]
-
-    if not os.path.exists(image_path):
-        logger.error(f"File not found: {image_path}")
-        return [
-            TextContent(
-                type="text",
-                text=json.dumps(
-                    {"error": f"File not found: {image_path}"}, ensure_ascii=True
-                ),
-            )
-        ]
-
+    logger.info(f"Starting image analysis: {image_path}")
+    
+    # Валидация изображения
     if not is_image_valid(image_path):
-        mime_type = get_file_mime_type(image_path)
-        logger.error(f"Invalid file format: {mime_type}")
-        return [
-            TextContent(
-                type="text",
-                text=json.dumps(
-                    {"error": f"File is not a supported image. MIME type: {mime_type}"},
-                    ensure_ascii=True,
-                ),
-            )
-        ]
-
+        raise ValueError(f"File is not a supported image: {image_path}")
+    
+    # Получение системной инструкции
     try:
-        logger.info(f"Starting image analysis: {image_path}")
-
-        result = image_analyzer.analyze(
-            image_path=image_path,
-            user_prompt=arguments.get("user_prompt", ""),
-            system_instruction_name=arguments.get("system_instruction_name", "default"),
-            system_instruction_override=arguments.get("system_instruction_override"),
-            system_instruction_file_path=arguments.get("system_instruction_file_path"),
+        system_instruction = get_system_instruction(
+            name=system_instruction_name,
+            override=system_instruction_override,
+            file_path=system_instruction_file_path
         )
-
-        if "error" in result:
-            logger.error(f"Analysis error: {result['error']}")
-            return [
-                TextContent(
-                    type="text", text=json.dumps(result, indent=2, ensure_ascii=True)
-                )
-            ]
-
-        logger.info("Analysis completed successfully")
-        # Успешный результат тоже с ensure_ascii=True
-        return [
-            TextContent(
-                type="text", text=json.dumps(result, indent=2, ensure_ascii=True)
-            )
-        ]
-
     except FileNotFoundError as e:
-        error_msg = f"File not found during analysis: {e}"
-        logger.error(error_msg)
-        return [
-            TextContent(
-                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=True)
-            )
-        ]
-
+        logger.error(f"System instruction file not found: {e}")
+        raise
     except IOError as e:
-        error_msg = f"I/O error: {e}"
-        logger.error(error_msg)
-        return [
-            TextContent(
-                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=True)
-            )
-        ]
-
-    except Exception as e:
-        error_msg = f"Unexpected error during analysis: {e}"
-        logger.exception(error_msg)
-        return [
-            TextContent(
-                type="text", text=json.dumps({"error": error_msg}, ensure_ascii=True)
-            )
-        ]
-
-
-async def main():
-    """Run the MCP server main loop."""
-    logger.info("Starting Gemini Image Analyzer MCP server...")
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            InitializationOptions(
-                server_name="gemini-media-mcp",
-                server_version="1.0.0",
-                capabilities=server.get_capabilities(
-                    notification_options=NotificationOptions(),
-                    experimental_capabilities={},
-                ),
-            ),
+        logger.error(f"Error reading system instruction file: {e}")
+        raise
+    
+    # Проверка наличия системной инструкции
+    if system_instruction is None and system_instruction_name:
+        available = list(AVAILABLE_IMAGE_ANALYSIS_PROMPTS.keys())
+        raise ValueError(
+            f"Prompt '{system_instruction_name}' not found. Available: {available}"
         )
+    
+    # Анализ изображения
+    result = gemini_client.analyze_image(
+        image_path=image_path,
+        user_prompt=user_prompt,
+        system_instruction_override=system_instruction
+    )
+    
+    logger.info("Analysis completed successfully")
+    return result
 
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        mcp.run()
     except KeyboardInterrupt:
         logger.info("Server stopped by user (KeyboardInterrupt)")
     except Exception as e:
