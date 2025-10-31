@@ -14,6 +14,8 @@ SUPPORTED_IMAGE_MIME_TYPES: List[str] = [
     "image/png",
     "image/gif",
     "image/webp",
+    "image/heic",
+    "image/heif",
 ]
 
 
@@ -40,6 +42,8 @@ def get_file_mime_type(file_path: str) -> str | None:
         ".png": "image/png",
         ".gif": "image/gif",
         ".webp": "image/webp",
+        ".heic": "image/heic",
+        ".heif": "image/heif",
     }
 
     return extension_map.get(file_extension, "application/octet-stream")
