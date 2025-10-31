@@ -36,30 +36,45 @@ Press `Ctrl+C` to stop.
 
 ## 3. First Analysis
 
+### Image Analysis
 In your MCP client, ask:
 
 ```
 Analyze this image: C:\Users\YourName\Pictures\photo.jpg
 ```
 
-## 4. Custom Prompts
+### Audio Analysis
+In your MCP client, ask:
 
 ```
+Analyze this audio: C:\Users\YourName\Music\audio.mp3
+```
+
+## 4. Custom Prompts
+
+### Image Analysis
+```
 Analyze C:\Photos\sunset.jpg and describe the colors and mood
+```
+
+### Audio Analysis
+```
+Summarize this audio: C:\Users\YourName\Recordings\meeting.mp3
 ```
 
 ## Common Commands
 
 | Task | Command |
 |------|---------|
-| Basic analysis | `Analyze image: /path/to/image.jpg` |
-| Custom prompt | `Describe emotions in /path/to/photo.jpg` |
+| Basic image analysis | `Analyze image: /path/to/image.jpg` |
+| Basic audio analysis | `Analyze audio: /path/to/audio.mp3` |
+| Custom image prompt | `Describe emotions in /path/to/photo.jpg` |
+| Audio transcription | `Transcribe this audio: /path/to/audio.wav` |
 | Technical analysis | Use `system_instruction_name: "technical"` |
 
 ## Next Steps
 
-- [💡 Usage Guide](usage.md) - Detailed usage instructions
-- [📝 Examples](examples.md) - More examples
+- [💡 Usage Guide](usage.md) - Detailed usage instructions and examples
 
 ---
 

@@ -88,13 +88,13 @@ Error encoding image to base64
 
 **Symptoms:**
 
-- No error but empty `description` field
+- No error but the response is empty or lacks detail.
 
 **Solution:**
 
-1. Try different prompt
-2. Check image quality (not too blurry)
-3. Switch to `gemini-2.5-pro` model
+1. Try a more specific or different prompt.
+2. Check the quality of the media file (e.g., not too blurry or noisy).
+3. Switch to a more powerful model like `gemini-2.5-pro` for complex tasks.
 
 ### Issue: Slow analysis performance
 
@@ -150,5 +150,4 @@ python -c "import sys; print(f'Python: {sys.version}'); from config import GEMIN
 **Still need help?**
 
 - [Troubleshooting Guide](troubleshooting.md)
-- [FAQ](faq.md)
-- [GitHub Issues](https://github.com/your-username/gemini-media-mcp/issues)
+- [GitHub Issues](https://github.com/VladimirMonin/gemini-media-mcp/issues)

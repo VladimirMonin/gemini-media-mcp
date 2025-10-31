@@ -75,8 +75,8 @@ python -c "from config import GEMINI_API_KEY; print('Key loaded' if GEMINI_API_K
 
 **Solution:**
 
-- Maximum file size is 20 MB
-- Resize image before analysis
+- Maximum file size is 20 MB for images and 19.5 MB for audio.
+- Resize or re-encode the media file before analysis.
 
 ## Image Analysis Issues
 
@@ -101,11 +101,26 @@ python -c "from PIL import Image; Image.open('input.bmp').save('output.jpg')"
 - Use absolute paths: `C:\Users\Name\Pictures\photo.jpg`
 - Check file exists and readable
 
+## Audio Analysis Issues
+
+### ❌ Error: "Unsupported audio format"
+
+**Supported formats:**
+
+- MP3, WAV, AIFF, AAC, OGG, FLAC
+
+**Solution:**
+Convert the audio file using a tool like FFmpeg or an online converter.
+
+### ❌ Error: "Invalid analysis_type"
+
+**Solution:**
+Ensure you are using one of the supported analysis types: `summary`, `transcription`, or `detailed`.
+
 ## Getting More Help
 
 - [Common Issues](common-issues.md) - Specific error scenarios
-- [FAQ](faq.md) - Frequently asked questions
-- [GitHub Issues](https://github.com/your-username/gemini-media-mcp/issues)
+- [GitHub Issues](https://github.com/VladimirMonin/gemini-media-mcp/issues)
 
 ---
 

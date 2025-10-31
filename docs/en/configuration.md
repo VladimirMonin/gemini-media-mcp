@@ -54,12 +54,16 @@ Same configuration as Claude Desktop.
 
 ## Model Configuration
 
-Edit `config.py` to change default model:
+You can change the default model by editing the `config.py` file. The default is `gemini-2.5-flash-lite` for its balance of speed and performance.
 
 ```python
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"  # Fast
-# DEFAULT_GEMINI_MODEL = "gemini-2.5-pro"  # Advanced
+# In config.py
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"  # Fast and efficient (Default)
+# DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"      # Balanced performance
+# DEFAULT_GEMINI_MODEL = "gemini-2.5-pro"        # Highest quality
 ```
+
+You can also override the model for a specific request. See the [Usage Guide](usage.md) for details.
 
 ## Next Steps
 

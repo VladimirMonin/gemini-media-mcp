@@ -88,13 +88,13 @@ Error encoding image to base64
 
 **Симптомы:**
 
-- Нет ошибки, но поле `description` пустое
+- Нет ошибки, но ответ пустой или не содержит деталей.
 
 **Решение:**
 
-1. Попробуйте другой промпт
-2. Проверьте качество изображения (не слишком размытое)
-3. Переключитесь на модель `gemini-2.5-pro`
+1. Попробуйте более конкретный или другой промпт.
+2. Проверьте качество медиафайла (например, не слишком размытый или шумный).
+3. Переключитесь на более мощную модель, такую как `gemini-2.5-pro`, для сложных задач.
 
 ### Проблема: Медленная производительность анализа
 
@@ -150,5 +150,4 @@ python -c "import sys; print(f'Python: {sys.version}'); from config import GEMIN
 **Всё ещё нужна помощь?**
 
 - [Руководство по решению проблем](troubleshooting.md)
-- [FAQ](faq.md)
-- [GitHub Issues](https://github.com/your-username/gemini-media-mcp/issues)
+- [GitHub Issues](https://github.com/VladimirMonin/gemini-media-mcp/issues)

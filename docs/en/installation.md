@@ -9,7 +9,7 @@
 ## Step 1: Clone Repository
 
 ```bash
-git clone https://github.com/your-username/gemini-media-mcp.git
+git clone https://github.com/VladimirMonin/gemini-media-mcp.git
 cd gemini-media-mcp
 ```
 
@@ -38,10 +38,10 @@ pip install -r requirements.txt
 ## Step 4: Verify Installation
 
 ```bash
-python server.py --help
+python server.py
 ```
 
-If you see help information, installation was successful!
+If you see an output like `INFO - Starting Gemini Media Analyzer MCP server...`, the installation was successful. Press `Ctrl+C` to stop the server.
 
 ## Next Steps
 
