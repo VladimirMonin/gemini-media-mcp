@@ -98,6 +98,7 @@ class GeminiClient:
                 config_params["system_instruction"] = system_instruction
             if response_schema:
                 config_params["response_mime_type"] = "application/json"
+                # Pass Pydantic model directly - library handles conversion
                 config_params["response_schema"] = response_schema
 
             config = types.GenerateContentConfig(**config_params)
