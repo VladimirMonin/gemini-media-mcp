@@ -8,7 +8,6 @@ import logging
 import os
 import sys
 
-# Простая настройка кодировки для Windows
 if sys.platform == "win32":
     os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
@@ -31,7 +30,7 @@ except ImportError as e:
     logger.error("Try: pip install -r requirements.txt")
     sys.exit(1)
 
-# Импортируем инструменты из папки tools
+
 try:
     from tools.image_analyzer import analyze_image
     from tools.audio_analyzer import analyze_audio
@@ -40,11 +39,10 @@ except ImportError as e:
     sys.exit(1)
 
 
-# Инициализация FastMCP сервера
+
 mcp = FastMCP("gemini-media-analyzer")
 
-# Регистрация инструментов
-# Декоратор @mcp.tool() теперь не нужен в самом файле инструмента
+
 mcp.tool()(analyze_image)
 logger.info(f"Tool '{analyze_image.__name__}' registered successfully.")
 mcp.tool()(analyze_audio)
