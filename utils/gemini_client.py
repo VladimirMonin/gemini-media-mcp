@@ -38,41 +38,38 @@ class GeminiClient:
         self.client = Client(api_key=GEMINI_API_KEY)
         logger.info(f"Initialized GeminiClient with model: {model_name}")
 
-    def analyze_image(
+    def generate_content(
         self,
-        image_path: str,
-        user_prompt: str,
-        system_instruction_override: Optional[str] = None,
-    ) -> Union[ImageAnalysisResponse, ErrorResponse]:
-        """Analyze an image using the Gemini API.
+        prompt: str,
+        image_path: Optional[str] = None,
+        media_bytes: Optional[bytes] = None,
+        mime_type: Optional[str] = None,
+        system_instruction: Optional[str] = None,
+        response_schema=None,
+    ) -> str:
+        """Generate content with media using the Gemini API.
 
         Args:
-            image_path: Path to the image file.
-            user_prompt: User's analysis prompt.
-            system_instruction_override: Custom system instruction to use for the analysis.
+            prompt: The text prompt for the model.
+            image_path: Optional path to an image file.
+            media_bytes: Optional media data in bytes.
+            mime_type: The MIME type of the media_bytes.
+            system_instruction: Optional system instruction for the model.
+            response_schema: Optional Pydantic model for structured response.
 
         Returns:
-            ImageAnalysisResponse on success, ErrorResponse on failure.
+            The raw text response from the model.
         """
         try:
-            try:
-                image = Image.open(image_path)
+            media_part = None
+            if image_path:
+                media_part = Image.open(image_path)
                 logger.debug(f"Loaded image: {image_path}")
-            except FileNotFoundError:
-                logger.error(f"Image file not found: {image_path}")
-                return ErrorResponse(
-                    error="Image file not found",
-                    details=image_path,
-                )
-            except IOError as e:
-                logger.error(f"Failed to read image file: {e}")
-                return ErrorResponse(
-                    error="Error reading image file",
-                    details=str(e),
-                )
+            elif media_bytes and mime_type:
+                media_part = types.Part.from_bytes(data=media_bytes, mime_type=mime_type)
+                logger.debug(f"Loaded media bytes with MIME type: {mime_type}")
 
-            prompt_content = user_prompt if user_prompt else "Analyze this image."
-            contents = [prompt_content, image]
+            contents = [prompt, media_part] if media_part else [prompt]
 
             config_params = {
                 "temperature": 0.7,
@@ -95,53 +92,36 @@ class GeminiClient:
                         threshold=types.HarmBlockThreshold.BLOCK_ONLY_HIGH,
                     ),
                 ],
-                "response_mime_type": "application/json",
-                "response_schema": ImageAnalysisResponse,
             }
 
-            if system_instruction_override:
-                config_params["system_instruction"] = system_instruction_override
-                logger.debug("Using provided system instruction.")
+            if system_instruction:
+                config_params["system_instruction"] = system_instruction
+            if response_schema:
+                config_params["response_mime_type"] = "application/json"
+                config_params["response_schema"] = response_schema
 
             config = types.GenerateContentConfig(**config_params)
 
-            logger.info(f"Sending analysis request for: {image_path}")
+            logger.info("Sending content generation request to Gemini.")
             response = self.client.models.generate_content(
                 model=self.model_name, contents=contents, config=config
             )
 
-            if hasattr(response, "candidates") and response.candidates:
-                response_text = (response.text or "").strip()
+            if hasattr(response, "text"):
+                return response.text or ""
+            
+            # Handle cases where the response might be blocked
+            if hasattr(response, "prompt_feedback") and response.prompt_feedback:
+                feedback = response.prompt_feedback
+                if hasattr(feedback, "block_reason") and feedback.block_reason:
+                    logger.warning(f"Request blocked: {feedback.block_reason}")
+                    raise ValueError(f"Request blocked by safety filters: {feedback.block_reason}")
 
-                try:
-                    result_dict = json.loads(response_text)
-                    logger.info("Successfully analyzed image")
-                    return ImageAnalysisResponse(**result_dict)
-                except json.JSONDecodeError as e:
-                    logger.error(f"JSON parsing error: {e}")
-                    return ErrorResponse(
-                        error="JSON parsing error",
-                        details=str(e),
-                        raw_response=response_text,
-                    )
-            else:
-                if hasattr(response, "prompt_feedback") and response.prompt_feedback:
-                    feedback = response.prompt_feedback
-                    if hasattr(feedback, "block_reason") and feedback.block_reason:
-                        logger.warning(f"Request blocked: {feedback.block_reason}")
-                        return ErrorResponse(
-                            error="Request blocked by safety filters",
-                            details=str(feedback.block_reason),
-                        )
-                logger.error("No response from Gemini model")
-                return ErrorResponse(error="Failed to get response from Gemini model")
+            raise ValueError("Failed to get a valid response from Gemini model.")
 
         except Exception as e:
-            logger.exception(f"Unexpected error during image analysis: {e}")
-            return ErrorResponse(
-                error="Unexpected error during image analysis",
-                details=str(e),
-            )
+            logger.exception(f"Unexpected error during content generation: {e}")
+            raise
 
     def generate_text(self, prompt: str, **kwargs) -> str:
         """Generate text based on a prompt.

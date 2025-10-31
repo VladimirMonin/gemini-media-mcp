@@ -49,3 +49,15 @@ class ErrorResponse(BaseModel):
         default=None,
         description="Raw model response if format mismatch occurred.",
     )
+
+
+class AudioAnalysisResponse(BaseModel):
+    """Structured response from Gemini audio analysis."""
+
+    title: Optional[str] = Field(default=None, description="Suggested title for the audio.")
+    summary: Optional[str] = Field(default=None, description="Brief summary of the audio content.")
+    transcription: Optional[str] = Field(default=None, description="Full transcription of the audio.")
+    participants: Optional[list[str]] = Field(default=None, description="List of identified participants.")
+    hashtags: Optional[list[str]] = Field(default=None, description="Keywords or topics as hashtags.")
+    action_items: Optional[list[str]] = Field(default=None, description="List of action items mentioned.")
+    raw_text: str = Field(..., description="Raw text response from the model.")

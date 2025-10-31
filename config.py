@@ -55,3 +55,22 @@ AVAILABLE_IMAGE_ANALYSIS_PROMPTS = {
     "default": DEFAULT_IMAGE_ANALYSIS_SYSTEM_PROMPT,
     "technical": TECHNICAL_IMAGE_ANALYSIS_SYSTEM_PROMPT,
 }
+
+# --- Audio Analysis Configuration ---
+
+SUPPORTED_AUDIO_FORMATS = {
+    "audio/mpeg": "MP3",
+    "audio/mp3": "MP3",
+    "audio/wav": "WAV",
+    "audio/x-wav": "WAV",
+    "audio/aiff": "AIFF",
+    "audio/x-aiff": "AIFF",
+    "audio/aac": "AAC",
+    "audio/aacp": "AAC",
+    "audio/ogg": "OGG",
+    "application/ogg": "OGG",
+    "audio/flac": "FLAC",
+    "audio/x-flac": "FLAC",
+}
+
+MAX_FILE_SIZE_MB = 19.5

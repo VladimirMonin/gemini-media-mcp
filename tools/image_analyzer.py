@@ -1,5 +1,6 @@
 """Image analysis tool for the Gemini Media MCP server."""
 
+import json
 from config import (
     AVAILABLE_IMAGE_ANALYSIS_PROMPTS,
     DEFAULT_GEMINI_MODEL,
@@ -111,16 +112,29 @@ def analyze_image(
     # Инициализация клиента и анализ
     try:
         gemini_client = GeminiClient(model_name=final_model_name)
-        result = gemini_client.analyze_image(
+        response_text = gemini_client.generate_content(
+            prompt=user_prompt,
             image_path=image_path,
-            user_prompt=user_prompt,
-            system_instruction_override=system_instruction,
+            system_instruction=system_instruction,
+            response_schema=ImageAnalysisResponse,
         )
-        logger.info("Analysis completed successfully")
+        
+        try:
+            result_dict = json.loads(response_text)
+            result = ImageAnalysisResponse(**result_dict)
+            logger.info("Analysis completed successfully")
+            return result
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"Failed to parse JSON response: {e}")
+            return ErrorResponse(
+                error="JSON parsing error",
+                details=str(e),
+                raw_response=response_text,
+            )
+            
     except Exception as e:
         logger.exception(f"Failed to analyze image with model {final_model_name}: {e}")
         return ErrorResponse(
             error="Image analysis failed",
             details=str(e),
         )
-    return result

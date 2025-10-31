@@ -34,6 +34,7 @@ except ImportError as e:
 # Импортируем инструменты из папки tools
 try:
     from tools.image_analyzer import analyze_image
+    from tools.audio_analyzer import analyze_audio
 except ImportError as e:
     logger.error(f"Failed to import tools: {e}")
     sys.exit(1)
@@ -46,6 +47,8 @@ mcp = FastMCP("gemini-media-analyzer")
 # Декоратор @mcp.tool() теперь не нужен в самом файле инструмента
 mcp.tool()(analyze_image)
 logger.info(f"Tool '{analyze_image.__name__}' registered successfully.")
+mcp.tool()(analyze_audio)
+logger.info(f"Tool '{analyze_audio.__name__}' registered successfully.")
 
 
 if __name__ == "__main__":
