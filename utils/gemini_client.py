@@ -43,47 +43,18 @@ class GeminiClient:
         image_path: str,
         user_prompt: str,
         system_instruction_override: Optional[str] = None,
-        system_instruction_file_path: Optional[str] = None,
     ) -> Union[ImageAnalysisResponse, ErrorResponse]:
         """Analyze an image using the Gemini API.
 
         Args:
             image_path: Path to the image file.
             user_prompt: User's analysis prompt.
-            system_instruction_override: Custom system instruction to override defaults.
-            system_instruction_file_path: Path to file containing system instruction.
+            system_instruction_override: Custom system instruction to use for the analysis.
 
         Returns:
             ImageAnalysisResponse on success, ErrorResponse on failure.
         """
         try:
-            final_system_instruction = None
-
-            if system_instruction_file_path:
-                try:
-                    with open(system_instruction_file_path, "r", encoding="utf-8") as f:
-                        final_system_instruction = f.read()
-                    logger.debug(
-                        f"Loaded system instruction from: {system_instruction_file_path}"
-                    )
-                except FileNotFoundError:
-                    logger.error(
-                        f"System instruction file not found: {system_instruction_file_path}"
-                    )
-                    return ErrorResponse(
-                        error="System instruction file not found",
-                        details=system_instruction_file_path,
-                    )
-                except IOError as e:
-                    logger.error(f"Failed to read system instruction file: {e}")
-                    return ErrorResponse(
-                        error="Error reading system instruction file",
-                        details=str(e),
-                    )
-            elif system_instruction_override:
-                final_system_instruction = system_instruction_override
-                logger.debug("Using custom system instruction override")
-
             try:
                 image = Image.open(image_path)
                 logger.debug(f"Loaded image: {image_path}")
@@ -128,8 +99,9 @@ class GeminiClient:
                 "response_schema": ImageAnalysisResponse,
             }
 
-            if final_system_instruction:
-                config_params["system_instruction"] = final_system_instruction
+            if system_instruction_override:
+                config_params["system_instruction"] = system_instruction_override
+                logger.debug("Using provided system instruction.")
 
             config = types.GenerateContentConfig(**config_params)
 
