@@ -129,3 +129,14 @@ Comprehensive documentation is available in both English and Russian, including:
   - **Link:** https://github.com/VladimirMonin/gemini-media-mcp/issues/1
   - **Description:** Resolves a cross-platform compatibility issue where the server fails to start on macOS due to incorrect log file path creation.
   - **Solution:** Changed relative path `Path("logs")` to absolute path `Path(__file__).parent.parent / "logs"` in `utils/logger.py`.
+
+- **#2: Реализация правильной передачи API ключей для локальных MCP серверов**
+  - **Status:** ✅ Resolved
+  - **Link:** https://github.com/VladimirMonin/gemini-media-mcp/issues/2
+  - **Description:** Переход от текущей архитектуры с `.env` файлом на сервере к правильной архитектуре, где API ключи передаются через клиентскую конфигурацию в `servers_config.json`.
+  - **Solution:** 
+    - Обновлен `config.py` с функцией `get_api_key()` для гибкой загрузки API ключей с приоритетом переменных окружения
+    - Добавлены CLI инструменты в `scripts/install_server.py`
+    - Созданы конфигурационные классы в `config/mcp_config.py`
+    - Обновлена документация с новыми инструкциями по установке
+    - Добавлены примеры конфигурации для разных MCP клиентов

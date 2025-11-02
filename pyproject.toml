@@ -23,6 +23,11 @@ dev = [
     "isort>=5.12.0",
     "mypy>=1.0.0"
 ]
+cli = [
+    "click>=8.0.0",
+    "typer>=0.9.0",
+    "mcp[cli]>=1.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/your-username/gemini-media-mcp"
@@ -36,3 +41,4 @@ build-backend = "hatchling.build"
 
 [project.scripts]
 gemini-image-mcp = "server:main"
+install-gemini-mcp = "scripts.install_server:main"

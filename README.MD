@@ -72,20 +72,33 @@ MCP (Model Context Protocol) сервер для анализа изображе
 
 ##  Quick Start / Быстрый старт
 
-```bash
-# Clone / Клонировать
-git clone https://github.com/your-username/gemini-media-mcp.git
-cd gemini-media-mcp
+### Using Installer (Recommended)
 
-# Install / Установить
-pip install -r requirements.txt
+1.  **Install the package with CLI dependencies:**
+    ```bash
+    pip install .[cli]
+    ```
+2.  **Run the installer:**
+    ```bash
+    install-gemini-mcp --gemini-api-key "your_gemini_api_key"
+    ```
 
-# Configure / Настроить
-cp .env.example .env
+### Manual Installation
 
-# Run / Запустить
-python server.py
-```
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/VladimirMonin/gemini-media-mcp.git
+    cd gemini-media-mcp
+    ```
+2.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+3.  **Configure your MCP client** to pass the `GEMINI_API_KEY` environment variable. See [Client Configuration Examples](docs/en/client_examples.md).
+4.  **Run the server:**
+    ```bash
+    python server.py
+    ```
 
 ---
 
