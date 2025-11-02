@@ -26,8 +26,9 @@ def get_logger(name: str) -> logging.Logger:
 
     logger.setLevel(logging.INFO)
 
-    # Create logs directory if it doesn't exist
-    log_dir = Path("logs")
+    # Use absolute path to ensure logs are created in the project directory
+    project_root = Path(__file__).parent.parent
+    log_dir = project_root / "logs"
     log_dir.mkdir(exist_ok=True)
 
     # Formatter for all handlers

@@ -120,3 +120,12 @@ Comprehensive documentation is available in both English and Russian, including:
 1. **Video Analysis**: Research and plan video analysis implementation
 2. **Generation Features**: Explore image and audio generation capabilities
 3. **Performance Optimization**: Monitor and optimize for large-scale usage
+
+## Tracked Issues
+
+### GitHub Issues
+- **#1: Fix MCP Server Crash on macOS Due to Incorrect Log Path**
+  - **Status:** ✅ Resolved
+  - **Link:** https://github.com/VladimirMonin/gemini-media-mcp/issues/1
+  - **Description:** Resolves a cross-platform compatibility issue where the server fails to start on macOS due to incorrect log file path creation.
+  - **Solution:** Changed relative path `Path("logs")` to absolute path `Path(__file__).parent.parent / "logs"` in `utils/logger.py`.
