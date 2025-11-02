@@ -5,16 +5,45 @@ and model configurations for the image analysis service.
 """
 
 import os
-from dotenv import load_dotenv
+def get_api_key() -> str:
+    """
+    Получает API-ключ Gemini из переменных окружения или файла .env.
 
-load_dotenv()
+    Приоритет:
+    1. Переменная окружения `GEMINI_API_KEY`.
+    2. Файл `.env` в корневом каталоге проекта (для локальной разработки).
 
-GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
+    Returns:
+        str: Найденный API-ключ.
+
+    Raises:
+        ValueError: Если API-ключ не найден ни в одном из источников.
+    """
+    # 1. Проверяем переменные окружения (высший приоритет)
+    api_key = os.getenv("GEMINI_API_KEY")
+    if api_key:
+        return api_key
+
+    # 2. Пытаемся загрузить из .env (для удобства локальной разработки)
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            return api_key
+    except ImportError:
+        # Если dotenv не установлен, просто пропускаем этот шаг
+        pass
+
+    # 3. Если ключ не найден, вызываем ошибку
     raise ValueError(
-        "GEMINI_API_KEY not found in environment variables. "
-        "Please create a .env file with GEMINI_API_KEY='your_key'"
+        "Ключ GEMINI_API_KEY не найден. "
+        "Пожалуйста, установите его как переменную окружения или "
+        "передайте через конфигурацию клиента MCP."
     )
+
+
+GEMINI_API_KEY = get_api_key()
 
 GEMINI_MODELS = [
     "gemini-2.5-flash-lite",
