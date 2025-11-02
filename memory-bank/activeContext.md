@@ -3,6 +3,10 @@
 ## Current Work Focus
 The project has recently been enhanced with new audio analysis capabilities and updated to support the latest Gemini models, including the new Flash Lite model. Documentation has been comprehensively updated to reflect these new features.
 
+Two major new features are now planned for implementation:
+- **Video Analysis**: Two-phase approach for analyzing video files (MVP with inline_data, then File API)
+- **Web Search**: Internet search capabilities using Google Search API through Gemini
+
 ## Recent Changes
 
 ### New Audio Analysis Feature (October 2025)
@@ -49,8 +53,8 @@ The project has recently been enhanced with new audio analysis capabilities and 
 - **Task #2**: Implemented proper API key transmission architecture for local MCP servers
 
 ### 📋 Next Steps
-- Consider adding video analysis capabilities
-- Explore image and audio generation features
+- **Task #3**: Implement video analysis with two-phase approach (MVP + File API)
+- **Task #4**: Implement web search capabilities using Google Search API
 - Monitor user feedback on new audio analysis
 - Consider adding more analysis types for existing media
 - **Completed**: Task #1 - Fixed macOS server crash (closed)

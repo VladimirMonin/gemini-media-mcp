@@ -5,16 +5,17 @@ The project addresses the need for local, privacy-focused multimedia analysis us
 
 ## Problems Solved
 - **Privacy Concerns**: Users can analyze media locally without data leaving their machine
-- **Accessibility**: Provides AI-powered descriptions for images and transcriptions for audio
+- **Accessibility**: Provides AI-powered descriptions for images, transcriptions for audio, and analysis for video
+- **Information Access**: Enables web search capabilities for up-to-date information
 - **Flexibility**: Supports multiple analysis types and custom prompts
 - **Integration**: Works seamlessly with MCP-compatible clients like Claude Desktop and Cursor
 
 ## How It Should Work
 1. Users configure the server with their Gemini API key
-2. MCP clients can access image and audio analysis tools
-3. Users provide media files and analysis requests
-4. Server processes requests using Gemini AI models
-5. Structured responses are returned to the client
+2. MCP clients can access image, audio, video analysis, and web search tools
+3. Users provide media files, search queries, or analysis requests
+4. Server processes requests using Gemini AI models and Google Search API
+5. Structured responses are returned to the client with sources and metadata
 
 ## User Experience Goals
 - **Simple Setup**: Easy configuration with environment variables
@@ -31,7 +32,8 @@ The project addresses the need for local, privacy-focused multimedia analysis us
 
 ## Key Value Propositions
 - **Privacy-First**: Local processing with user's API key
-- **Multi-Modal**: Support for both images and audio analysis
+- **Multi-Modal**: Support for images, audio, video analysis, and web search
 - **Model Choice**: Multiple Gemini models for different use cases
 - **Open Standards**: Built on MCP protocol for broad compatibility
 - **Extensible**: Modular architecture for future enhancements
+- **Comprehensive Analysis**: Rich structured responses with events, transcriptions, and sources

@@ -9,7 +9,7 @@ The system follows a modular MCP server architecture with separate tools for dif
 - **server.py**: Main MCP server entry point
 - **config.py**: Configuration management with environment variables
 - **models/**: Pydantic models for structured responses
-- **tools/**: Individual analysis tools (image_analyzer.py, audio_analyzer.py)
+- **tools/**: Individual analysis tools (image_analyzer.py, audio_analyzer.py, video_analyzer.py, web_search.py)
 - **utils/**: Shared utilities (gemini_client.py, file_utils.py, logger.py)
 
 ### Tool Registration Pattern
