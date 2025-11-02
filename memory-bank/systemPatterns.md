@@ -35,6 +35,8 @@ mcp.tool()(analyze_audio)
 - Default configuration values in config.py
 - Support for multiple Gemini models
 - File format and size validation
+- **Flexible API Key Loading**: Priority-based key loading from environment variables
+- **CLI Installation Tools**: Automated server setup with environment configuration
 
 ## New Audio Analysis Capabilities
 

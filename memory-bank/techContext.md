@@ -32,9 +32,12 @@ cd gemini-media-mcp
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
+# Configure environment (optional - can also use CLI installer)
 cp .env.example .env
 # Edit .env with your GEMINI_API_KEY
+
+# Or use CLI installer for automatic setup
+python scripts/install_server.py
 ```
 
 ### Running the Server

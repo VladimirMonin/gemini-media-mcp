@@ -58,6 +58,7 @@ Comprehensive documentation is available in both English and Russian, including:
 2. **Model Updates**: Integrated Gemini 2.5 Flash Lite as default model
 3. **Documentation Overhaul**: Updated all documentation to reflect new features
 4. **Memory Bank Creation**: Established complete project memory bank
+5. **API Key Architecture**: Implemented proper API key transmission for MCP servers
 
 ## Known Issues
 
