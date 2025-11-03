@@ -9,6 +9,13 @@ Two major new features are now planned for implementation:
 
 ## Recent Changes
 
+### Image Generation Feature (November 2025)
+- **Task #5**: ✅ Completed - Implementation of image generation via Gemini API
+- **Image Generation Tool**: Added `tools/image_generator.py` with text-to-image and text+image(s)-to-image capabilities
+- **Supported Models**: `gemini-2.5-flash-image-preview` for image generation
+- **Response Structure**: Returns absolute path to generated image file
+- **Integration**: Seamlessly integrated into existing MCP server architecture
+
 ### New Audio Analysis Feature (October 2025)
 - **Audio Analysis Tool**: Added `tools/audio_analyzer.py` with comprehensive audio processing
 - **Supported Formats**: MP3, WAV, AIFF, AAC, OGG, FLAC
@@ -42,8 +49,10 @@ Two major new features are now planned for implementation:
 - Error handling and validation
 - MCP protocol compliance
 - **Flexible API Key Management**: New architecture for secure key transmission via client configuration
+- **Image Generation**: Text-to-image and text+image(s)-to-image capabilities
 
 ### 🔄 Recently Implemented
+- **Task #5**: Image generation tool with text-to-image and text+image(s)-to-image capabilities
 - Audio analysis tool with multiple analysis types
 - Support for Gemini 2.5 Flash Lite model
 - Updated configuration with latest models
@@ -51,14 +60,16 @@ Two major new features are now planned for implementation:
 - Memory bank creation and population
 - **Cross-platform fix**: Resolved macOS server crash by fixing log path creation in `utils/logger.py`
 - **Task #2**: Implemented proper API key transmission architecture for local MCP servers
+- **Image Generation Debugging**: Resolved text+image(s)-to-image functionality issues
 
 ### 📋 Next Steps
 - **Task #3**: Implement video analysis with two-phase approach (MVP + File API)
 - **Task #4**: Implement web search capabilities using Google Search API
-- Monitor user feedback on new audio analysis
+- Monitor user feedback on new audio analysis and image generation
 - Consider adding more analysis types for existing media
 - **Completed**: Task #1 - Fixed macOS server crash (closed)
 - **Completed**: Task #2 - Implemented proper API key transmission (closed)
+- **Completed**: Task #5 - Implemented image generation capabilities (closed)
 
 ## Active Decisions and Considerations
 
@@ -109,9 +120,20 @@ Two major new features are now planned for implementation:
 - Audio analysis complements image analysis well
 - MCP protocol enables broad client compatibility
 - Configuration-driven approach simplifies maintenance
+- **Image Generation**: Text+image(s)-to-image requires absolute paths for reference images
+- **API Limits**: Free tier quotas can cause 429 errors that appear as functional issues
 
 ### User Experience Focus
 - Clear error messages improve troubleshooting
 - Comprehensive examples accelerate adoption
 - Flexible model selection meets diverse needs
 - Privacy-first approach builds trust
+- **Absolute Paths**: Critical requirement for file operations in MCP tools
+- **Documentation Clarity**: Explicit path requirements prevent user confusion
+
+### Recent Investigation Insights (November 2025)
+- **Image Generation Debugging**: Text+image(s)-to-image functionality was working correctly
+- **Root Cause**: API rate limits (429 RESOURCE_EXHAUSTED) were mistaken for code issues
+- **Solution**: Code cleanup and documentation improvements
+- **Key Finding**: All file paths in MCP tools must be absolute paths
+- **Documentation**: Updated to explicitly state absolute path requirements

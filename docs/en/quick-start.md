@@ -62,12 +62,22 @@ Analyze C:\Photos\sunset.jpg and describe the colors and mood
 Summarize this audio: C:\Users\YourName\Recordings\meeting.mp3
 ```
 
+## 5. First Generation
+
+### Image Generation
+In your MCP client, ask:
+
+```
+Generate: "a cat wearing a hat"
+```
+
 ## Common Commands
 
 | Task | Command |
 |------|---------|
 | Basic image analysis | `Analyze image: /path/to/image.jpg` |
 | Basic audio analysis | `Analyze audio: /path/to/audio.mp3` |
+| Image generation | `Generate: "a cat wearing a hat"` |
 | Custom image prompt | `Describe emotions in /path/to/photo.jpg` |
 | Audio transcription | `Transcribe this audio: /path/to/audio.wav` |
 | Technical analysis | Use `system_instruction_name: "technical"` |

@@ -62,6 +62,7 @@ python server.py
 - `gemini-2.5-flash-lite` - Default, fast and efficient
 - `gemini-2.5-flash` - Balanced performance
 - `gemini-2.5-pro` - Highest quality
+- `gemini-2.5-flash-image-preview` - Image generation model
 
 ### File Format Support
 
@@ -101,7 +102,8 @@ gemini-media-mcp/
 ├── tools/                # Analysis tools
 │   ├── __init__.py
 │   ├── image_analyzer.py # Image analysis tool
-│   └── audio_analyzer.py # Audio analysis tool
+│   ├── audio_analyzer.py # Audio analysis tool
+│   └── image_generator.py # Image generation tool
 └── utils/                # Shared utilities
     ├── __init__.py
     ├── gemini_client.py  # Gemini API client
@@ -132,6 +134,16 @@ analyze_audio(
     user_prompt: str,
     analysis_type: str = "summary",
     model_name: Optional[str] = None,
+    output_path: Optional[str] = None
+)
+```
+
+### Image Generation
+
+```python
+generate_image(
+    user_prompt: str,
+    image_paths: Optional[List[str]] = None,
     output_path: Optional[str] = None
 )
 ```

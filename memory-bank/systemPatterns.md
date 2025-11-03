@@ -17,9 +17,11 @@ The system follows a modular MCP server architecture with separate tools for dif
 # Tools are imported and registered in server.py
 from tools.image_analyzer import analyze_image
 from tools.audio_analyzer import analyze_audio
+from tools.image_generator import generate_image
 
 mcp.tool()(analyze_image)
 mcp.tool()(analyze_audio)
+mcp.tool()(generate_image)
 ```
 
 ## Key Technical Decisions
@@ -39,6 +41,12 @@ mcp.tool()(analyze_audio)
 - **CLI Installation Tools**: Automated server setup with environment configuration
 
 ## New Audio Analysis Capabilities
+
+### Image Generation Tool (tools/image_generator.py)
+- **Supported Models**: `gemini-2.5-flash-image-preview` for image generation
+- **Generation Types**: text-to-image, text+image(s)-to-image
+- **Response Structure**: Absolute path to generated image file
+- **Integration**: Uses existing GeminiClient and file utilities
 
 ### Audio Analysis Tool (tools/audio_analyzer.py)
 - **Supported Formats**: MP3, WAV, AIFF, AAC, OGG, FLAC
@@ -64,6 +72,7 @@ class AudioAnalysisResponse(BaseModel):
 - `gemini-2.5-flash-lite` - Fast and efficient (default)
 - `gemini-2.5-flash` - Balanced performance  
 - `gemini-2.5-pro` - Highest quality
+- `gemini-2.5-flash-image-preview` - Image generation model
 
 ### Model Selection
 - Configurable via environment variables

@@ -25,32 +25,7 @@ GEMINI_API_KEY="ваш_настоящий_api_ключ_здесь"
 
 ## Конфигурация MCP клиента
 
-### Claude Desktop
-
-**Расположение файла конфигурации:**
-
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-- Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-**Добавьте эту конфигурацию:**
-
-```json
-{
-  "mcpServers": {
-    "gemini-media-analyzer": {
-      "command": "/путь/к/venv/bin/python",
-      "args": ["/путь/к/server.py"],
-      "env": {
-        "GEMINI_API_KEY": "ваш_ключ"
-      }
-    }
-  }
-}
-```
-
-### Cursor / Windsurf
-
-Такая же конфигурация, как для Claude Desktop.
+Смотрите [Примеры конфигурации клиентов](client_examples.md) для подробных инструкций по настройке различных MCP клиентов, включая Cline.
 
 ## Настройка модели
 

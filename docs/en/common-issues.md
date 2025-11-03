@@ -108,6 +108,29 @@ Error encoding image to base64
 2. Reduce image size before analysis
 3. Check network connection
 
+## Image Generation Problems
+
+### Issue: Error `429 RESOURCE_EXHAUSTED` or "API didn't return data"
+
+**Symptoms:**
+
+- Error during image generation
+- Message "Failed to generate image. API didn't return data"
+
+**Solution:**
+
+- These are API limits (especially on free tier). Wait and try again.
+
+### Issue: Error "Image not found" when using `image_paths`
+
+**Symptoms:**
+
+- Error when specifying paths to reference images
+
+**Solution:**
+
+- The tool requires **absolute paths** to files, not relative paths.
+
 ## Windows-Specific Issues
 
 ### Issue: PowerShell script execution disabled

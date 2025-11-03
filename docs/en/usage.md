@@ -51,6 +51,34 @@ Available preset prompts in `config.py`:
 }
 ```
 
+## Image Generation
+
+### Text-to-Image Generation
+
+```json
+{
+  "user_prompt": "A cat wearing a hat, pixel art style"
+}
+```
+
+### Text+Image(s)-to-Image Generation
+
+```json
+{
+  "user_prompt": "Create a similar image in cyberpunk style",
+  "image_paths": ["/path/to/reference1.jpg", "/path/to/reference2.png"]
+}
+```
+
+### Generation with Custom Output Path
+
+```json
+{
+  "user_prompt": "Futuristic city with neon lights",
+  "output_path": "/path/to/save/image.png"
+}
+```
+
 ## Audio Analysis
 
 ### Basic Audio Analysis
@@ -103,6 +131,14 @@ Available preset prompts in `config.py`:
 | `system_instruction_file_path` | string | ❌ | Path to a file containing a custom system instruction. |
 | `model_name` | string | ❌ | The specific Gemini model to use (e.g., "gemini-2.5-pro"). |
 
+### Image Generation
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `user_prompt` | string | ✅ | Text description for image generation |
+| `image_paths` | string[] | ❌ | List of absolute paths to reference images |
+| `output_path` | string | ❌ | Path to save the generated image |
+
 ### Audio Analysis
 
 | Parameter | Type | Required | Description |
@@ -127,6 +163,15 @@ The server returns a structured JSON response based on the `ImageAnalysisRespons
 }
 ```
 
+### Image Generation Response
+
+```json
+{
+  "status": "success",
+  "image_path": "/full/path/to/generated/image.png"
+}
+```
+
 ### Audio Analysis Response
 
 ```json
@@ -146,6 +191,7 @@ The server returns a structured JSON response based on the `ImageAnalysisRespons
 - `gemini-2.5-flash-lite` - Fast and efficient (default)
 - `gemini-2.5-flash` - Balanced performance
 - `gemini-2.5-pro` - Highest quality
+- `gemini-2.5-flash-image-preview` - Image generation model
 
 ## Next Steps
 
