@@ -34,6 +34,7 @@ except ImportError as e:
 try:
     from tools.image_analyzer import analyze_image
     from tools.audio_analyzer import analyze_audio
+    from tools.image_generator import generate_image
 except ImportError as e:
     logger.error(f"Failed to import tools: {e}")
     sys.exit(1)
@@ -47,6 +48,8 @@ mcp.tool()(analyze_image)
 logger.info(f"Tool '{analyze_image.__name__}' registered successfully.")
 mcp.tool()(analyze_audio)
 logger.info(f"Tool '{analyze_audio.__name__}' registered successfully.")
+mcp.tool()(generate_image)
+logger.info(f"Tool '{generate_image.__name__}' registered successfully.")
 
 
 if __name__ == "__main__":
