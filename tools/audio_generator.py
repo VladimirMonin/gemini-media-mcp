@@ -1,7 +1,7 @@
 import os
 import yaml
 import wave
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from google import genai
 from google.genai import types
 from config import GEMINI_API_KEY, GEMINI_VOICES_DATA, DEFAULT_VOICE, OUTPUT_AUDIO_DIR
@@ -114,13 +114,9 @@ def _generate_content_request(
 
 def get_audio_generation_guide() -> str:
     """
-    Returns the comprehensive guide for using the audio generation tool.
-    Reads the full voice catalog and the example YAML structure from documentation files.
+    Returns comprehensive guide for audio generation including voice catalog and YAML examples.
     """
-    # Define paths relative to the project root
-    # Get the directory containing this file (tools/)
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    # Go up one level to get project root
     base_dir = os.path.dirname(current_dir)
 
     voices_file_path = os.path.join(base_dir, "docs", "gem", "voices.md")
@@ -130,7 +126,6 @@ def get_audio_generation_guide() -> str:
 
     guide_content = ["# Audio Generation Guide\n"]
 
-    # 1. Read Voices Catalog
     if os.path.exists(voices_file_path):
         try:
             with open(voices_file_path, "r", encoding="utf-8") as f:
@@ -143,7 +138,6 @@ def get_audio_generation_guide() -> str:
     else:
         guide_content.append(f"Voices file not found at: {voices_file_path}\n")
 
-    # 2. Read YAML Example
     if os.path.exists(example_file_path):
         try:
             with open(example_file_path, "r", encoding="utf-8") as f:
@@ -161,7 +155,9 @@ def get_audio_generation_guide() -> str:
     return "\n".join(guide_content)
 
 
-def generate_audio_from_yaml(yaml_path: str, model: str = DEFAULT_TTS_MODEL) -> str:
+def generate_audio_from_yaml(
+    yaml_path: str, model: str = DEFAULT_TTS_MODEL, output_path: Optional[str] = None
+) -> str:
     """
     Generates audio from a local YAML script file using Gemini TTS.
 
@@ -171,15 +167,21 @@ def generate_audio_from_yaml(yaml_path: str, model: str = DEFAULT_TTS_MODEL) -> 
                Default: 'gemini-2.5-flash-preview-tts' (faster, cheaper).
                Alternative: 'gemini-2.5-pro-preview-tts' (higher quality, more expensive).
                You must explicitly specify the Pro model if needed.
+        output_path: Absolute path where to save the output WAV file.
+                     If not provided, saves to output_audio/<script_name>.wav in project root.
     """
     try:
         # 1. Load and Validate
         data = _load_yaml_script(yaml_path)
         cast = data.get("cast", [])
         script = data.get("script", [])
+        style_prompt = data.get("style_prompt", "")  # Optional style instruction
 
         if len(cast) > 2:
             return "Error: Gemini TTS currently supports a maximum of 2 speakers."
+
+        if len(cast) == 0:
+            return "Error: At least one speaker must be defined in 'cast'."
 
         # 2. Prepare Configuration
         speaker_map, speaker_configs = _prepare_speaker_config(cast)
@@ -188,7 +190,18 @@ def generate_audio_from_yaml(yaml_path: str, model: str = DEFAULT_TTS_MODEL) -> 
         is_multi_speaker = len(cast) > 1
 
         if is_multi_speaker:
-            prompt_text = ""
+            # Build dialogue in format: "Speaker: text"
+            # For multi-speaker, we MUST include speaker names in a conversational format
+            speaker_names = " and ".join([actor.get("name") for actor in cast])
+
+            prompt_text = f"TTS the following conversation between {speaker_names}"
+
+            if style_prompt:
+                # Add style instruction after the TTS prefix
+                prompt_text += f" ({style_prompt})"
+
+            prompt_text += ":\n\n"
+
             for line in script:
                 sp = line.get("speaker")
                 txt = line.get("text")
@@ -196,11 +209,22 @@ def generate_audio_from_yaml(yaml_path: str, model: str = DEFAULT_TTS_MODEL) -> 
                     return f"Error: Speaker '{sp}' in script is not defined in 'cast'."
                 prompt_text += f"{sp}: {txt}\n"
         else:
-            # Single speaker: just the text
-            prompt_text = " ".join([line.get("text", "") for line in script])
+            # Single speaker
+            if style_prompt:
+                # For single speaker, style prompt can be an instruction like "Say in a whisper:"
+                prompt_text = f"{style_prompt}\n"
+                prompt_text += " ".join([line.get("text", "") for line in script])
+            else:
+                prompt_text = " ".join([line.get("text", "") for line in script])
 
         logger.info(
             f"Generating audio. Model: {model}, Speakers: {len(cast)}, Script length: {len(prompt_text)}"
+        )
+        logger.info(f"Is multi-speaker: {is_multi_speaker}")
+        logger.info(f"Speaker map: {speaker_map}")
+        logger.info(f"Full prompt:\n{prompt_text}")
+        logger.info(
+            f"Speaker configs: {[(sc.speaker, 'voice=' + str(sc.voice_config.prebuilt_voice_config.voice_name if sc.voice_config and sc.voice_config.prebuilt_voice_config else 'None')) for sc in speaker_configs]}"
         )
 
         # 4. Call API
@@ -217,13 +241,26 @@ def generate_audio_from_yaml(yaml_path: str, model: str = DEFAULT_TTS_MODEL) -> 
         if not part.inline_data:
             return "Error: No audio data received."
 
-        os.makedirs(OUTPUT_AUDIO_DIR, exist_ok=True)
-        base_name = os.path.splitext(os.path.basename(yaml_path))[0]
-        output_path = os.path.join(OUTPUT_AUDIO_DIR, f"{base_name}.wav")
+        # Determine output path
+        if output_path:
+            # User provided absolute path
+            final_output_path = output_path
+            # Ensure .wav extension
+            if not final_output_path.lower().endswith(".wav"):
+                final_output_path += ".wav"
+            # Create directory if needed
+            output_dir = os.path.dirname(final_output_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+        else:
+            # Default: save to project's output_audio folder
+            os.makedirs(OUTPUT_AUDIO_DIR, exist_ok=True)
+            base_name = os.path.splitext(os.path.basename(yaml_path))[0]
+            final_output_path = os.path.join(OUTPUT_AUDIO_DIR, f"{base_name}.wav")
 
-        save_wave_file(output_path, part.inline_data.data)
+        save_wave_file(final_output_path, part.inline_data.data)
 
-        return f"Audio generated successfully: {os.path.abspath(output_path)}"
+        return f"Audio generated successfully: {os.path.abspath(final_output_path)}"
 
     except Exception as e:
         logger.error(f"Generation failed: {e}")

@@ -1,6 +1,15 @@
 # Example Audio Generation Script
 # This file demonstrates the structure for generating audio using Gemini Media MCP.
 
+# --- OPTIONAL: STYLE PROMPT ---
+# You can add a natural language instruction to control the style, tone, pace, or accent.
+# This prompt will be placed before the dialogue.
+# Examples:
+#   "Make Host sound professional and clear, Expert sound wise and thoughtful:"
+#   "Read this in an energetic, upbeat tone:"
+# Leave empty or omit if you don't need style control.
+style_prompt: "Make Host sound enthusiastic and engaging, Expert sound calm and knowledgeable:"
+
 # --- CAST SECTION ---
 # Define the speakers here.
 # You can have 1 or 2 speakers.

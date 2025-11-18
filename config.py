@@ -138,7 +138,9 @@ AVAILABLE_AUDIO_ANALYSIS_PROMPTS = {
 
 # --- Audio Generation Configuration ---
 
-OUTPUT_AUDIO_DIR = "output_audio"
+# Get project root directory (where config.py is located)
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_AUDIO_DIR = os.path.join(_PROJECT_ROOT, "output_audio")
 
 # Полный каталог голосов с метаданными для выбора ИИ
 GEMINI_VOICES_DATA = {
