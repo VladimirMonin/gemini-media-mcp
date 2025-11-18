@@ -35,10 +35,13 @@ try:
     from tools.image_analyzer import analyze_image
     from tools.audio_analyzer import analyze_audio
     from tools.image_generator import generate_image
+    from tools.audio_generator import (
+        generate_audio_from_yaml,
+        get_audio_generation_guide,
+    )
 except ImportError as e:
     logger.error(f"Failed to import tools: {e}")
     sys.exit(1)
-
 
 
 mcp = FastMCP("gemini-media-analyzer")
@@ -50,6 +53,10 @@ mcp.tool()(analyze_audio)
 logger.info(f"Tool '{analyze_audio.__name__}' registered successfully.")
 mcp.tool()(generate_image)
 logger.info(f"Tool '{generate_image.__name__}' registered successfully.")
+mcp.tool()(generate_audio_from_yaml)
+logger.info(f"Tool '{generate_audio_from_yaml.__name__}' registered successfully.")
+mcp.tool()(get_audio_generation_guide)
+logger.info(f"Tool '{get_audio_generation_guide.__name__}' registered successfully.")
 
 
 if __name__ == "__main__":

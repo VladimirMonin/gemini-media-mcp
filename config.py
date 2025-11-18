@@ -5,6 +5,8 @@ and model configurations for the image analysis service.
 """
 
 import os
+
+
 def get_api_key() -> str:
     """
     Получает API-ключ Gemini из переменных окружения или файла .env.
@@ -27,6 +29,7 @@ def get_api_key() -> str:
     # 2. Пытаемся загрузить из .env (для удобства локальной разработки)
     try:
         from dotenv import load_dotenv
+
         load_dotenv()
         api_key = os.getenv("GEMINI_API_KEY")
         if api_key:
@@ -132,3 +135,109 @@ Do not include any text or explanations outside of the JSON object.
 AVAILABLE_AUDIO_ANALYSIS_PROMPTS = {
     "default": DEFAULT_AUDIO_ANALYSIS_SYSTEM_PROMPT,
 }
+
+# --- Audio Generation Configuration ---
+
+OUTPUT_AUDIO_DIR = "output_audio"
+
+# Полный каталог голосов с метаданными для выбора ИИ
+GEMINI_VOICES_DATA = {
+    "achernar": {"gender": "Male", "desc": "Clean, friendly, engaging, mid-range."},
+    "achird": {"gender": "Female", "desc": "Young, high-pitched, breathy, friendly."},
+    "algenib": {
+        "gender": "Female",
+        "desc": "Warm, confident, mid-range, authoritative.",
+    },
+    "alnilam": {"gender": "Male", "desc": "Energetic, low-mid, enthusiastic, ad-like."},
+    "aoede": {
+        "gender": "Female",
+        "desc": "Clean, conversational, thoughtful, intelligent.",
+    },
+    "autonoe": {
+        "gender": "Female",
+        "desc": "Bright, mature, resonant, wise, audiobook style.",
+    },
+    "callirrhoe": {
+        "gender": "Female",
+        "desc": "Confident, clear, professional, energetic.",
+    },
+    "charon": {
+        "gender": "Male",
+        "desc": "Smooth, conversational, low-mid, trustworthy.",
+    },
+    "despina": {
+        "gender": "Female",
+        "desc": "Warm, approachable, clear, lifestyle ad style.",
+    },
+    "enceladus": {
+        "gender": "Male",
+        "desc": "Breathy, energetic, enthusiastic, promo style.",
+    },
+    "erinome": {
+        "gender": "Female",
+        "desc": "Professional, articulate, lower-mid, sophisticated.",
+    },
+    "fenrir": {"gender": "Male", "desc": "Friendly, clear, conversational, natural."},
+    "gacrux": {
+        "gender": "Female",
+        "desc": "Smooth, confident, low-mid, authoritative.",
+    },
+    "iapetus": {"gender": "Male", "desc": "Friendly, mid-tone, casual, 'everyman'."},
+    "kore": {
+        "gender": "Female",
+        "desc": "Energetic, young, high-mid, confident, bright.",
+    },
+    "laomedeia": {
+        "gender": "Female",
+        "desc": "Clear, conversational, engaging, inquisitive.",
+    },
+    "leda": {
+        "gender": "Female",
+        "desc": "Composed, professional, lower resonance, authoritative.",
+    },
+    "orus": {"gender": "Male", "desc": "Mature, deep, resonant, thoughtful, wise."},
+    "puck": {"gender": "Male", "desc": "Clear, direct, mid-range, 'guy next door'."},
+    "pulcherrima": {
+        "gender": "Female",
+        "desc": "Direct, bright, energetic, high-mid, youthful.",
+    },
+    "rasalgethi": {
+        "gender": "Male",
+        "desc": "Informative, conversational, inquisitive, eccentric.",
+    },
+    "sadachbia": {
+        "gender": "Male",
+        "desc": "Lively, deep, textured, cool, rebellious.",
+    },
+    "sadaltager": {
+        "gender": "Male",
+        "desc": "Knowledgeable, friendly, enthusiastic, professional.",
+    },
+    "schedar": {
+        "gender": "Male",
+        "desc": "Even, friendly, mid-tone, casual, grounded.",
+    },
+    "sulafat": {
+        "gender": "Female",
+        "desc": "Warm, confident, clear, persuasive, intelligent.",
+    },
+    "umbriel": {
+        "gender": "Male",
+        "desc": "Calm, smooth, low-mid, authoritative yet friendly.",
+    },
+    "vindemiatrix": {
+        "gender": "Female",
+        "desc": "Gentle, calm, thoughtful, low-mid, mature.",
+    },
+    "zephyr": {
+        "gender": "Female",
+        "desc": "Bright, energetic, light, youthful, positive.",
+    },
+    "zubenelgenubi": {
+        "gender": "Male",
+        "desc": "Laid-back, deep, resonant, authoritative, epic.",
+    },
+    "algieba": {"gender": "Male", "desc": "Calm."},
+}
+
+DEFAULT_VOICE = "Kore"

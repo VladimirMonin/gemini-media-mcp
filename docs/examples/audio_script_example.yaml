@@ -1,0 +1,29 @@
+# Example Audio Generation Script
+# This file demonstrates the structure for generating audio using Gemini Media MCP.
+
+# --- CAST SECTION ---
+# Define the speakers here.
+# You can have 1 or 2 speakers.
+# Voice names must match those available in the Gemini library (see voices.md).
+cast:
+  - name: "Host"
+    voice: "Kore"  # Energetic, young female voice
+  
+  - name: "Expert"
+    voice: "Orus"  # Mature, deep male voice
+
+# --- SCRIPT SECTION ---
+# The dialogue to be spoken.
+# 'speaker' must match a 'name' defined in the cast section.
+script:
+  - speaker: "Host"
+    text: "Welcome back to 'Future Tech'. Today we are discussing the new Gemini models."
+
+  - speaker: "Expert"
+    text: "It is a pleasure to be here. The advancements in audio generation are particularly fascinating."
+
+  - speaker: "Host"
+    text: "Can you give us a quick demonstration?"
+
+  - speaker: "Expert"
+    text: "Certainly. The system can now handle multi-speaker dialogues with distinct voice personalities."
