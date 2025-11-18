@@ -218,13 +218,7 @@ def generate_audio_from_yaml(
                 prompt_text = " ".join([line.get("text", "") for line in script])
 
         logger.info(
-            f"Generating audio. Model: {model}, Speakers: {len(cast)}, Script length: {len(prompt_text)}"
-        )
-        logger.info(f"Is multi-speaker: {is_multi_speaker}")
-        logger.info(f"Speaker map: {speaker_map}")
-        logger.info(f"Full prompt:\n{prompt_text}")
-        logger.info(
-            f"Speaker configs: {[(sc.speaker, 'voice=' + str(sc.voice_config.prebuilt_voice_config.voice_name if sc.voice_config and sc.voice_config.prebuilt_voice_config else 'None')) for sc in speaker_configs]}"
+            f"Generating audio. Model: {model}, Speakers: {len(cast)}, Multi-speaker: {is_multi_speaker}"
         )
 
         # 4. Call API
