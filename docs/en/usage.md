@@ -192,6 +192,110 @@ The server returns a structured JSON response based on the `ImageAnalysisRespons
 - `gemini-2.5-flash` - Balanced performance
 - `gemini-2.5-pro` - Highest quality
 - `gemini-2.5-flash-image-preview` - Image generation model
+- `gemini-2.5-flash-preview-tts` - Text-to-speech model (default)
+- `gemini-2.5-pro-preview-tts` - Premium quality text-to-speech model
+
+## Audio Generation
+
+### Get Generation Guide
+
+Get list of available voices (30 prebuilt voices across 24 languages) and YAML structure examples:
+
+```python
+get_audio_generation_guide()
+```
+
+### Generate Speech from YAML Script
+
+#### Single Voice Example
+
+Create a YAML script `podcast.yaml`:
+
+```yaml
+cast:
+  - name: "Host"
+    voice: "Kore"
+
+script:
+  - speaker: "Host"
+    text: "Welcome to our technology podcast!"
+  - speaker: "Host"
+    text: "Today we'll discuss the latest in AI."
+```
+
+Generate:
+
+```python
+generate_audio_from_yaml(yaml_path="/path/to/podcast.yaml")
+# Result: output_audio/podcast.wav
+```
+
+#### Multi-Speaker Example
+
+```yaml
+cast:
+  - name: "Grandpa"
+    voice: "Orus"
+  - name: "Grandma"
+    voice: "Aoede"
+
+style_prompt: "Russian folk tale, dramatic narration"
+
+script:
+  - speaker: "Grandpa"
+    text: "Bake me a bun, grandma."
+  - speaker: "Grandma"
+    text: "What shall I bake it from? We have no flour."
+  - speaker: "Grandpa"
+    text: "Oh, grandma! Scrape the cupboard, sweep the flour bin."
+```
+
+Generate with custom path:
+
+```python
+generate_audio_from_yaml(
+    yaml_path="/path/to/tale.yaml",
+    model="gemini-2.5-pro-preview-tts",
+    output_path="/path/to/save/tale.wav"
+)
+```
+
+### Audio Generation Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `yaml_path` | string | ✅ | Absolute path to YAML script file |
+| `model` | string | ❌ | TTS model (default: gemini-2.5-flash-preview-tts) |
+| `output_path` | string | ❌ | Absolute path for output WAV (default: output_audio/filename.wav) |
+
+### YAML Script Structure
+
+```yaml
+# Optional: style instruction for tone/accent control
+style_prompt: "Calm and professional tone, news anchor style"
+
+# Required: character list
+cast:
+  - name: "Name1"    # Character name
+    voice: "Kore"    # Voice name (case-sensitive, capitalized)
+  - name: "Name2"
+    voice: "Orus"
+
+# Required: dialogue/text
+script:
+  - speaker: "Name1"
+    text: "First line of dialogue"
+  - speaker: "Name2"
+    text: "Response line"
+```
+
+### Audio Generation Features
+
+- **Speaker Count:** 1-2 speakers (Gemini API limitation)
+- **Voices:** 30 prebuilt voices with different characteristics
+- **Languages:** Auto-detection from 24 supported languages
+- **Output Format:** WAV, 24kHz, mono, 16-bit PCM
+- **Style Prompt:** Optional instruction for speech manner control
 
 ## Next Steps
 
