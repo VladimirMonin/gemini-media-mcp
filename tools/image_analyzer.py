@@ -60,7 +60,7 @@ def analyze_image(
     Args:
         image_path: Absolute path to the image file on local machine.
         user_prompt: Custom analysis request (optional).
-        model_name: The Gemini model to use (e.g., "gemini-1.5-flash").
+        model_name: The Gemini model to use (e.g., "gemini-2.5-flash").
                     Defaults to the one specified in config.py.
         system_instruction_name: Name of predefined system instruction.
         system_instruction_override: Custom system instruction (overrides system_instruction_name).
