@@ -39,6 +39,7 @@ try:
         generate_audio_from_yaml,
         get_audio_generation_guide,
     )
+    from tools.gif_analyzer import analyze_gif, get_gif_guidelines
 except ImportError as e:
     logger.error(f"Failed to import tools: {e}")
     sys.exit(1)
@@ -57,6 +58,10 @@ mcp.tool()(generate_audio_from_yaml)
 logger.info(f"Tool '{generate_audio_from_yaml.__name__}' registered successfully.")
 mcp.tool()(get_audio_generation_guide)
 logger.info(f"Tool '{get_audio_generation_guide.__name__}' registered successfully.")
+mcp.tool()(analyze_gif)
+logger.info(f"Tool '{analyze_gif.__name__}' registered successfully.")
+mcp.tool()(get_gif_guidelines)
+logger.info(f"Tool '{get_gif_guidelines.__name__}' registered successfully.")
 
 
 if __name__ == "__main__":
