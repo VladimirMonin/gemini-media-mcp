@@ -1,36 +1,31 @@
-"""MCP server for image analysis using Google Gemini API.
-
-This server provides Model Context Protocol tools for analyzing
-images with Google's Gemini AI models using FastMCP.
-"""
-
 import logging
 import os
 import sys
 
+# 1. Фикс кодировки для Windows (критично для эмодзи и кириллицы)
 if sys.platform == "win32":
     os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
-try:
-    from utils.logger import get_logger
+# 2. НАСТРОЙКА ЛОГГЕРА: СТРОГО В STDERR
+# Это самое важное изменение. Теперь все print/info летят в поток ошибок,
+# оставляя основной канал чистым для JSON-сообщений протокола MCP.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stderr,  # <--- Направляем логи в stderr [cite: 23]
+)
+logger = logging.getLogger("gemini-media-mcp")
 
-    logger = get_logger(__name__)
-except Exception as e:
-    # Fallback если логгер не работает
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    logger.error(f"Logger initialization failed: {e}")
+logger.info("Starting server initialization...")
 
-logger.info("Starting server import phase...")
-
+# Импорт MCP (для версии пакета mcp >= 1.0.0)
 try:
     from mcp.server.fastmcp import FastMCP
 except ImportError as e:
     logger.error(f"Critical MCP import error: {e}")
-    logger.error("Try: pip install -r requirements.txt")
     sys.exit(1)
 
-
+# Импорт инструментов
 try:
     from tools.image_analyzer import analyze_image
     from tools.audio_analyzer import analyze_audio
@@ -45,33 +40,29 @@ except ImportError as e:
     logger.error(f"Failed to import tools: {e}")
     sys.exit(1)
 
+# Инициализация сервера
+# dependencies=["httpx"] помогает, если fastmcp пытается сам что-то догрузить
+mcp = FastMCP("gemini-media-analyzer", dependencies=["httpx"])
 
-mcp = FastMCP("gemini-media-analyzer")
-
-
+# Регистрация инструментов
 mcp.tool()(analyze_image)
-logger.info(f"Tool '{analyze_image.__name__}' registered successfully.")
-mcp.tool()(analyze_audio)
-logger.info(f"Tool '{analyze_audio.__name__}' registered successfully.")
-mcp.tool()(generate_image)
-logger.info(f"Tool '{generate_image.__name__}' registered successfully.")
-mcp.tool()(generate_audio_from_yaml)
-logger.info(f"Tool '{generate_audio_from_yaml.__name__}' registered successfully.")
-mcp.tool()(get_audio_generation_guide)
-logger.info(f"Tool '{get_audio_generation_guide.__name__}' registered successfully.")
-mcp.tool()(analyze_gif)
-logger.info(f"Tool '{analyze_gif.__name__}' registered successfully.")
-mcp.tool()(get_gif_guidelines)
-logger.info(f"Tool '{get_gif_guidelines.__name__}' registered successfully.")
-mcp.tool()(analyze_video)
-logger.info(f"Tool '{analyze_video.__name__}' registered successfully.")
+logger.info(f"Tool '{analyze_image.__name__}' registered.")
 
+mcp.tool()(analyze_audio)
+mcp.tool()(generate_image)
+mcp.tool()(generate_audio_from_yaml)
+mcp.tool()(get_audio_generation_guide)
+mcp.tool()(analyze_gif)
+mcp.tool()(get_gif_guidelines)
+mcp.tool()(analyze_video)
 
 if __name__ == "__main__":
     try:
-        mcp.run()
+        # 3. Явный запуск транспорта stdio
+        # Это стандарт для локальных CLI инструментов [cite: 30]
+        mcp.run(transport="stdio")
     except KeyboardInterrupt:
-        logger.info("Server stopped by user (KeyboardInterrupt)")
+        logger.info("Server stopped by user")
     except Exception as e:
         logger.exception(f"Critical error during server startup: {e}")
         sys.exit(1)
