@@ -214,18 +214,46 @@ def _extract_video_frames(
     """
     # Get video metadata
     try:
+        import math
+
         video_meta = iio.immeta(video_path)
         total_frames = video_meta.get("nframes", 0)
         native_fps = video_meta.get("fps", 30.0)
         duration = video_meta.get("duration", 0.0)
 
-        # If duration not in metadata, calculate from frames and fps
-        if duration == 0.0 and total_frames > 0:
-            duration = total_frames / native_fps
+        # Handle inf/NaN values from metadata
+        if isinstance(total_frames, (int, float)):
+            if (
+                total_frames == 0
+                or math.isinf(total_frames)
+                or math.isnan(total_frames)
+            ):
+                logger.warning(
+                    f"Invalid frame count from metadata: {total_frames}, will read dynamically"
+                )
+                total_frames = None
+            else:
+                total_frames = int(total_frames)  # Convert to int if valid
+        else:
+            logger.warning(
+                f"Unexpected frame count type: {type(total_frames)}, will read dynamically"
+            )
+            total_frames = None
 
-        logger.info(
-            f"Video: {total_frames} frames, {duration:.1f}s, {native_fps:.1f} native fps"
-        )
+        if duration == 0.0 or math.isinf(duration) or math.isnan(duration):
+            if total_frames and total_frames > 0:
+                duration = total_frames / native_fps
+            else:
+                duration = None
+
+        if total_frames:
+            logger.info(
+                f"Video: {total_frames} frames, {duration:.1f}s, {native_fps:.1f} native fps"
+            )
+        else:
+            logger.info(
+                f"Video metadata incomplete, will read all frames (estimated {native_fps:.1f} fps)"
+            )
 
     except Exception as e:
         logger.warning(f"Could not read video metadata: {e}")

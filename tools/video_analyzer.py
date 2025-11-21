@@ -379,7 +379,7 @@ def _build_multimodal_contents(
     contents = []
 
     # Add text prompt first
-    contents.append(types.Part.from_text(prompt))
+    contents.append(prompt)
 
     # Add all frames
     mime_type = f"image/{image_format}"
