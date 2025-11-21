@@ -1,658 +1,696 @@
 # Video Processing: Frames + Audio Strategy
 
-## Идея пользователя
+## Концепция
 
-Вместо использования дорогого нативного Video API, **извлекать кадры из видео** и **аудио-дорожку отдельно**, затем отправлять их в одном запросе к Gemini API как набор изображений + аудио.
+Анализ видео как **набора кадров + аудиодорожки** с максимальной оптимизацией размера и стоимости.
 
-**Потенциальные преимущества:**
+**Цель:** Экономия средств при анализе видео путем:
 
-- Контроль над количеством кадров (экономия токенов)
-- Возможность применить ресайз к кадрам (дополнительная экономия)
-- Гибкость в выборе качества vs стоимость
+- Гибкого контроля количества извлекаемых кадров (3 режима как в GIF)
+- Оптимизации формата и размера изображений (WEBP, 1080p по умолчанию)
+- Агрессивного сжатия аудио (Vorbis mono 64/32/24 kbps)
+- Отправки всех данных в **одном запросе** к Gemini API
+- **In-memory конвертации** без временных файлов
 
-## Анализ официальной документации
+**Ключевой вопрос:** Можно ли миксовать изображения и аудио в одном запросе?
+**Ответ:** ДА - Gemini поддерживает мультимодальные запросы с несколькими изображениями + аудио inline.
 
-### Поддержка Video API
+**Лимит Gemini:** 20 MB на весь inline request (из официальной документации `image_understanding.md`).
 
-Согласно [`video.md`](gem/video.md):
+## Технические решения для MVP
 
-**Нативный Video API:**
+### 1. Зависимости
 
-```python
-myfile = client.files.upload(file="path/to/sample.mp4")
-response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents=[myfile, "Summarize this video"]
-)
-```
+**Базовый подход (простая установка):**
 
-**Токенизация видео (из документации):**
-
-> - **Individual frames** (sampled at 1 FPS):
->   - If `mediaResolution` is set to **low**: **66 tokens per frame**
->   - Otherwise: **258 tokens per frame**
-> - **Audio**: **32 tokens per second**
-> - **Total**: Approximately **300 tokens per second** at default media resolution, or **100 tokens per second** at low media resolution
-
-**Лимиты:**
-
-- Модели с 2M контекстом: до **2 часов** видео (default) или **6 часов** (low resolution)
-- Модели с 1M контекстом: до **1 часа** видео (default) или **3 часа** (low resolution)
-
-### Поддержка множественных медиа в одном запросе
-
-Согласно [`image_understainding.md`](gem/image_understainding.md):
-
-```python
-contents = [prompt, image1, image2, image3, ...]
-```
-
-> You can provide multiple images in a single prompt by including multiple image `Part` objects in the `contents` array.
-
-**Лимит:** До **3,600 изображений** на запрос.
-
-Согласно [`audio.md`](gem/audio.md), аудио также можно отправлять как `Part`:
-
-```python
-myfile = client.files.upload(file="path/to/sample.mp3")
-response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents=["Describe this audio clip", myfile]
-)
-```
-
-### Комбинирование изображений и аудио
-
-**ВЫВОД:** Документация явно НЕ запрещает миксовать изображения и аудио в одном запросе.
-
-Согласно [`video.md`](gem/video.md), видео состоит из:
-
-- Кадров (изображений)
-- Аудио-дорожки
-
-Это означает, что **теоретически** можно отправить:
-
-```python
-contents = [prompt, frame1, frame2, frame3, audio_part]
-```
-
-**НО:** В документации нет явного примера такого использования.
-
-## Сравнение: Нативное Video API vs Frames + Audio
-
-### Нативное Video API
-
-**10 секунд видео, default media resolution:**
-
-- Кадры: 10 сек × 1 FPS × 258 токенов = **2,580 токенов**
-- Аудио: 10 сек × 32 токена = **320 токенов**
-- **Итого: ~3,000 токенов** (с учетом метаданных)
-
-**10 секунд видео, low media resolution:**
-
-- Кадры: 10 сек × 1 FPS × 66 токенов = **660 токенов**
-- Аудио: 10 сек × 32 токена = **320 токенов**
-- **Итого: ~1,000 токенов**
-
-### Подход "Frames + Audio"
-
-**10 секунд видео, настройки: fps=1.0, quality='fhd' (1920px):**
-
-- Кадры: 10 кадров × ~1,500 токенов = **15,000 токенов**
-- Аудио: 10 сек × 32 токена = **320 токенов**
-- **Итого: ~15,320 токенов** ❌ **В 5 РАЗ ДОРОЖЕ**
-
-**10 секунд видео, настройки: fps=0.5, quality='balanced' (960px):**
-
-- Кадры: 5 кадров × ~1,500 токенов = **7,500 токенов**
-- Аудио: 10 сек × 32 токена = **320 токенов**
-- **Итого: ~7,820 токенов** ❌ **В 2.5 РАЗА ДОРОЖЕ**
-
-**10 секунд видео, настройки: fps=0.5, quality='economy' (384px):**
-
-- Кадры: 5 кадров × 258 токенов = **1,290 токенов**
-- Аудио: 10 сек × 32 токена = **320 токенов**
-- **Итого: ~1,610 токенов** ✅ **Сопоставимо с low resolution**
-
-## Выводы
-
-### Когда нативное Video API лучше
-
-1. ✅ **Полное видео:** Когда нужно проанализировать всё видео целиком
-2. ✅ **Длинные видео:** >1 минуты (эффективнее по токенам)
-3. ✅ **Простота:** Не требует извлечения кадров и аудио
-4. ✅ **Стоимость:** **В 2-5 раз дешевле** при сопоставимом качестве
-5. ✅ **Метаданные:** Автоматические временные метки каждую секунду
-
-### Когда подход "Frames + Audio" может быть полезен
-
-1. ✅ **UHD видео с мелким текстом:** Нативное API ограничено 1 FPS и автоматическим разрешением
-2. ✅ **Специфические моменты:** Когда нужны точные кадры в конкретные моменты времени
-3. ✅ **Контроль качества:** Полный контроль над разрешением каждого кадра
-4. ✅ **Анализ статики:** Видео с редкими изменениями (лекции, презентации)
-
-### Рекомендация
-
-**ИСПОЛЬЗОВАТЬ НАТИВНОЕ VIDEO API** в 95% случаев, так как:
-
-- **Дешевле** в 2-5 раз
-- **Проще** в использовании
-- **Оптимизировано** Google для видео-анализа
-- Поддерживает **настройку FPS** и **clipping**
-
-## Случаи для подхода "Frames + Audio"
-
-### Сценарий 1: UHD видео-инструкция с текстом
-
-**Проблема:** Нативное Video API сэмплирует на 1 FPS с автоматическим разрешением, которое может быть недостаточным для читаемости мелкого текста.
-
-**Решение:**
-
-```python
-def analyze_uhd_video_with_text(
-    video_path: str,
-    prompt: str,
-    fps: float = 1.0,
-    frame_quality: str = 'fhd'
-):
-    """Analyze UHD video with high-quality frames for text readability.
-    
-    Args:
-        video_path: Path to video file
-        prompt: Analysis prompt
-        fps: Frame extraction rate (default: 1.0 = 1 frame/sec)
-        frame_quality: Quality preset ('fhd', 'uhd')
-    """
-    # Extract video frames
-    frames = extract_video_frames(video_path, fps=fps)
-    
-    # Resize frames based on quality preset
-    QUALITY_PRESETS = {
-        'uhd': None,    # No resize
-        'fhd': 1920,    # Full HD
-        'hd': 1280,     # HD
-    }
-    
-    max_dimension = QUALITY_PRESETS.get(frame_quality, 1920)
-    processed_frames = [
-        resize_image(frame, max_dimension)
-        for frame in frames
-    ]
-    
-    # Extract audio
-    audio_bytes = extract_audio(video_path)
-    audio_part = types.Part(
-        inline_data=types.Blob(
-            data=audio_bytes,
-            mime_type='audio/mp3'
-        )
-    )
-    
-    # Create content with frames + audio
-    contents = [prompt] + processed_frames + [audio_part]
-    
-    # Generate response
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=contents
-    )
-    
-    return response.text
-```
-
-**Стоимость (10 сек, fps=1.0, quality='fhd'):**
-
-- ~15,000 токенов (дорого, но текст читается)
-
-**VS Нативное API:**
-
-- ~3,000 токенов, но текст может быть нечитаемым
-
-### Сценарий 2: Выборочный анализ ключевых моментов
-
-**Проблема:** Нужно проанализировать только определенные моменты длинного видео (например, каждые 30 секунд).
-
-**Решение:**
-
-```python
-def analyze_key_moments(
-    video_path: str,
-    prompt: str,
-    timestamps: list[float],  # [5.0, 15.0, 45.0, 90.0]
-    frame_quality: str = 'hd'
-):
-    """Extract and analyze specific frames at given timestamps.
-    
-    Args:
-        video_path: Path to video file
-        prompt: Analysis prompt
-        timestamps: List of timestamps in seconds
-        frame_quality: Quality preset
-    """
-    frames = extract_frames_at_timestamps(video_path, timestamps)
-    
-    # Process frames
-    QUALITY_PRESETS = {'fhd': 1920, 'hd': 1280, 'balanced': 960}
-    max_dimension = QUALITY_PRESETS.get(frame_quality, 1280)
-    
-    processed_frames = [
-        resize_image(frame, max_dimension)
-        for frame in frames
-    ]
-    
-    # Extract audio segments around timestamps (±5 sec each)
-    audio_segments = extract_audio_segments(
-        video_path,
-        timestamps,
-        duration=10  # 10 sec segments
-    )
-    
-    # Create prompt with timestamp context
-    timestamp_context = f"Analyzing {len(timestamps)} key moments at: " + \
-                       ", ".join([f"{t:.1f}s" for t in timestamps])
-    
-    enhanced_prompt = f"{timestamp_context}\n\n{prompt}"
-    
-    # Build content
-    contents = [enhanced_prompt]
-    for i, (frame, audio) in enumerate(zip(processed_frames, audio_segments)):
-        contents.append(f"Frame at {timestamps[i]:.1f}s:")
-        contents.append(frame)
-        if audio:
-            contents.append(audio)
-    
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=contents
-    )
-    
-    return response.text
-```
-
-**Стоимость (4 ключевых момента, quality='hd'):**
-
-- 4 кадра × ~3,000 токенов = **~12,000 токенов**
-- Аудио: 4 сегмента × 10 сек × 32 = **~1,280 токенов**
-- **Итого: ~13,280 токенов**
-
-**VS Нативное API (анализ всего 90-сек видео):**
-
-- 90 сек × ~100 токенов (low res) = **~9,000 токенов** ✅ Дешевле
-- Но анализируется ВСЁ видео, а не только ключевые моменты
-
-### Сценарий 3: Сравнение кадров до/после
-
-**Проблема:** Нужно сравнить визуальные изменения между двумя моментами времени.
-
-**Решение:**
-
-```python
-def compare_video_moments(
-    video_path: str,
-    timestamp_before: float,
-    timestamp_after: float,
-    prompt: str = "What changed between these two moments?"
-):
-    """Compare two specific frames from video.
-    
-    Args:
-        video_path: Path to video
-        timestamp_before: First timestamp (seconds)
-        timestamp_after: Second timestamp (seconds)
-        prompt: Comparison prompt
-    """
-    frame_before = extract_frame_at_timestamp(video_path, timestamp_before)
-    frame_after = extract_frame_at_timestamp(video_path, timestamp_after)
-    
-    # High quality for comparison
-    frame_before = resize_image(frame_before, 1920)
-    frame_after = resize_image(frame_after, 1920)
-    
-    # Optional: extract audio between timestamps
-    audio_segment = extract_audio_segment(
-        video_path,
-        start=timestamp_before,
-        end=timestamp_after
-    )
-    
-    enhanced_prompt = f"""Compare these two frames from a video:
-- Frame 1: at {timestamp_before:.1f}s
-- Frame 2: at {timestamp_after:.1f}s
-Time difference: {timestamp_after - timestamp_before:.1f}s
-
-{prompt}"""
-    
-    contents = [
-        enhanced_prompt,
-        "Frame BEFORE:",
-        frame_before,
-        "Frame AFTER:",
-        frame_after
-    ]
-    
-    if audio_segment:
-        contents.append("Audio between frames:")
-        contents.append(audio_segment)
-    
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=contents
-    )
-    
-    return response.text
-```
-
-**Стоимость:**
-
-- 2 кадра × ~1,500 токенов = **~3,000 токенов**
-- Аудио: ~320 токенов
-- **Итого: ~3,320 токенов**
-
-Сопоставимо с нативным API, но **точечный анализ** вместо всего видео.
-
-## Реализация: Вспомогательные функции
-
-### Извлечение кадров из видео
-
-```python
-import cv2
-from PIL import Image
-import numpy as np
-
-def extract_video_frames(
-    video_path: str,
-    fps: float = 1.0
-) -> list[Image.Image]:
-    """Extract frames from video at specified FPS.
-    
-    Args:
-        video_path: Path to video file
-        fps: Frames per second to extract
-    
-    Returns:
-        List of PIL Images
-    """
-    cap = cv2.VideoCapture(video_path)
-    
-    video_fps = cap.get(cv2.CAP_PROP_FPS)
-    frame_interval = int(video_fps / fps)
-    
-    frames = []
-    frame_idx = 0
-    
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        
-        if frame_idx % frame_interval == 0:
-            # Convert BGR to RGB
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            pil_image = Image.fromarray(frame_rgb)
-            frames.append(pil_image)
-        
-        frame_idx += 1
-    
-    cap.release()
-    return frames
-
-
-def extract_frame_at_timestamp(
-    video_path: str,
-    timestamp: float
-) -> Image.Image:
-    """Extract single frame at specific timestamp.
-    
-    Args:
-        video_path: Path to video file
-        timestamp: Time in seconds
-    
-    Returns:
-        PIL Image
-    """
-    cap = cv2.VideoCapture(video_path)
-    
-    # Seek to timestamp
-    cap.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000)
-    
-    ret, frame = cap.read()
-    cap.release()
-    
-    if not ret:
-        raise ValueError(f"Could not extract frame at {timestamp}s")
-    
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(frame_rgb)
-
-
-def extract_frames_at_timestamps(
-    video_path: str,
-    timestamps: list[float]
-) -> list[Image.Image]:
-    """Extract frames at multiple timestamps.
-    
-    Args:
-        video_path: Path to video file
-        timestamps: List of timestamps in seconds
-    
-    Returns:
-        List of PIL Images
-    """
-    return [
-        extract_frame_at_timestamp(video_path, ts)
-        for ts in timestamps
-    ]
-```
-
-### Извлечение аудио
-
-```python
-from pydub import AudioSegment
-import io
-
-def extract_audio(
-    video_path: str,
-    format: str = 'mp3'
-) -> bytes:
-    """Extract full audio track from video.
-    
-    Args:
-        video_path: Path to video file
-        format: Audio format (mp3, wav, etc.)
-    
-    Returns:
-        Audio bytes
-    """
-    audio = AudioSegment.from_file(video_path)
-    
-    buffer = io.BytesIO()
-    audio.export(buffer, format=format)
-    
-    return buffer.getvalue()
-
-
-def extract_audio_segment(
-    video_path: str,
-    start: float,
-    end: float,
-    format: str = 'mp3'
-) -> bytes:
-    """Extract audio segment between timestamps.
-    
-    Args:
-        video_path: Path to video
-        start: Start time in seconds
-        end: End time in seconds
-        format: Audio format
-    
-    Returns:
-        Audio bytes
-    """
-    audio = AudioSegment.from_file(video_path)
-    
-    # Extract segment (pydub uses milliseconds)
-    segment = audio[int(start * 1000):int(end * 1000)]
-    
-    buffer = io.BytesIO()
-    segment.export(buffer, format=format)
-    
-    return buffer.getvalue()
-
-
-def extract_audio_segments(
-    video_path: str,
-    timestamps: list[float],
-    duration: float = 10.0,
-    format: str = 'mp3'
-) -> list[bytes]:
-    """Extract audio segments around timestamps.
-    
-    Args:
-        video_path: Path to video
-        timestamps: List of center timestamps
-        duration: Duration of each segment in seconds
-        format: Audio format
-    
-    Returns:
-        List of audio bytes
-    """
-    segments = []
-    half_duration = duration / 2
-    
-    for ts in timestamps:
-        start = max(0, ts - half_duration)
-        end = ts + half_duration
-        
-        segment = extract_audio_segment(video_path, start, end, format)
-        segments.append(segment)
-    
-    return segments
-```
-
-### Создание Parts для Gemini
-
-```python
-from google.genai import types
-
-def create_audio_part(audio_bytes: bytes, mime_type: str = 'audio/mp3') -> types.Part:
-    """Create audio Part for Gemini API.
-    
-    Args:
-        audio_bytes: Audio data
-        mime_type: MIME type
-    
-    Returns:
-        Part object
-    """
-    return types.Part(
-        inline_data=types.Blob(
-            data=audio_bytes,
-            mime_type=mime_type
-        )
-    )
-
-
-def create_video_analysis_content(
-    frames: list[Image.Image],
-    audio_bytes: bytes,
-    prompt: str,
-    frame_timestamps: Optional[list[float]] = None
-) -> list:
-    """Create content array for Gemini with frames + audio.
-    
-    Args:
-        frames: List of PIL Images
-        audio_bytes: Audio data
-        prompt: Analysis prompt
-        frame_timestamps: Optional timestamps for context
-    
-    Returns:
-        Content array for generateContent
-    """
-    contents = [prompt]
-    
-    # Add frames with optional timestamps
-    for i, frame in enumerate(frames):
-        if frame_timestamps:
-            contents.append(f"Frame at {frame_timestamps[i]:.1f}s:")
-        contents.append(frame)
-    
-    # Add audio
-    if audio_bytes:
-        contents.append("Audio track:")
-        contents.append(create_audio_part(audio_bytes))
-    
-    return contents
-```
-
-## Итоговая рекомендация
-
-### Используйте нативное Video API для
-
-1. ✅ Обычного анализа видео (описание, резюме, Q&A)
-2. ✅ Длинных видео (>1 минута)
-3. ✅ Видео без мелкого текста
-4. ✅ Когда важна экономия токенов
-
-**Настройки:**
-
-```python
-# Для экономии
-config = types.GenerateContentConfig(
-    media_resolution='LOW'  # 66 tokens/frame
-)
-
-# Для длинных видео
-video_metadata = types.VideoMetadata(
-    fps=0.5  # 1 кадр каждые 2 секунды
-)
-```
-
-### Используйте подход "Frames + Audio" для
-
-1. ✅ UHD видео с мелким текстом (инструкции, презентации)
-2. ✅ Анализа конкретных моментов (не всего видео)
-3. ✅ Сравнения кадров до/после
-4. ✅ Когда нужен полный контроль над качеством кадров
-
-**Настройки:**
-
-```python
-# Для UHD с текстом
-analyze_uhd_video_with_text(
-    video_path='tutorial.mp4',
-    fps=1.0,
-    frame_quality='fhd'  # 1920px max
-)
-
-# Для выборочного анализа
-analyze_key_moments(
-    video_path='lecture.mp4',
-    timestamps=[30.0, 120.0, 300.0],  # Ключевые моменты
-    frame_quality='hd'
-)
-```
-
-## Зависимости
-
-Для реализации понадобятся:
-
-```python
+```txt
 # requirements.txt
-opencv-python>=4.8.0     # Извлечение кадров
-pydub>=0.25.0            # Извлечение аудио
-ffmpeg-python>=0.2.0     # Работа с видео/аудио
-Pillow>=10.0.0           # Обработка изображений
-google-genai>=1.0.0      # Gemini API
+imageio-ffmpeg>=0.5.0    # Автоматический ffmpeg бинарник
+pillow>=10.0.0           # WEBP поддержка (уже есть)
+pydub>=0.25.1            # Аудио обработка
 ```
 
-**Системные зависимости:**
+**Преимущества:**
 
-- FFmpeg (для pydub и opencv)
+- `pip install` работает из коробки
+- Кроссплатформенность (Win/Mac/Linux)
+- Не требует системных зависимостей
+- ~10-15 MB дополнительно
 
-## Лимиты и ограничения
+**Продвинутый вариант (для будущего):**
 
-1. **Размер запроса:** 20MB для inline-данных (используйте Files API для больших файлов)
-2. **Максимум изображений:** 3,600 на запрос
-3. **Обработка:** Извлечение кадров и аудио требует CPU/RAM
-4. **Стоимость:** В большинстве случаев **дороже нативного Video API**
+- Автодетект системного ffmpeg (если установлен)
+- Использование более свежей версии
+- Скрипты установки для разных ОС
+
+### 2. Оптимизация форматов
+
+#### Изображения: WEBP + умный resize
+
+**Поддерживаемые форматы Gemini:**
+
+- PNG (`image/png`)
+- JPEG (`image/jpeg`)
+- **WEBP (`image/webp`)** ← Основной выбор
+- HEIC (`image/heic`)
+- HEIF (`image/heif`)
+
+**Стратегия для MVP:**
+
+- **По умолчанию:** 1080p WEBP quality 80
+- **Логика resize:** Если кадр >= 1080p → сжать до 1080p, иначе сжать до 1080p в любом случае
+- **Формат:** Всегда конвертируем в WEBP (даже если источник PNG/JPEG)
+- **In-memory:** Конвертация без временных файлов (как в `gif_processor.py`)
+
+**Почему WEBP:**
+
+- **На 25-35% меньше** размер чем JPEG при том же качестве
+- Нативная поддержка Gemini
+- Pillow поддерживает из коробки
+
+**Таблица размеров кадра WEBP quality 80:**
+
+| Разрешение | Размер/кадр | 10 кадров | 30 кадров | 60 кадров |
+|------------|-------------|-----------|-----------|----------|
+| 1080p | ~100 KB | 1 MB | 3 MB | 6 MB |
+| 720p | ~50 KB | 0.5 MB | 1.5 MB | 3 MB |
+| 480p | ~25 KB | 0.25 MB | 0.75 MB | 1.5 MB |
+
+#### Аудио: Vorbis mono с выбором битрейта
+
+**Стратегия для MVP:**
+
+- **По умолчанию:** 64 kbps mono Vorbis
+- **Опции пользователя:** 64, 32, 24 kbps
+- **Формат:** Vorbis (контейнер OGG) - лучше сжатие чем MP3
+- **Mono обязательно:** 2x экономия относительно stereo
+- **In-memory:** Конвертация через BytesIO без временных файлов
+
+**Таблица битрейтов (mono Vorbis):**
+
+| Битрейт | Качество | Размер/минута | 10 минут | 30 минут | 180 минут (3ч) |
+|---------|----------|---------------|----------|----------|----------------|
+| **64 kbps** | Отлично для речи + музыка | 0.48 MB | 4.8 MB | **14.4 MB** | 86 MB |
+| **32 kbps** | Хорошо для речи | 0.24 MB | 2.4 MB | **7.2 MB** | 43 MB |
+| **24 kbps** | Нормально для речи | 0.18 MB | 1.8 MB | **5.4 MB** | 32 MB |
+
+**Остаток для кадров при лимите 20 MB:**
+
+- 64 kbps (30 мин): ~5.6 MB на кадры → ~50 кадров 1080p
+- 32 kbps (30 мин): ~12.8 MB на кадры → ~120 кадров 1080p ✅ **Рекомендуемый баланс**
+- 24 kbps (30 мин): ~14.6 MB на кадры → ~140 кадров 1080p
+
+### 3. Лимиты Gemini API
+
+**Из документации [`image_understainding.md`](../gem/image_understainding.md):**
+
+- **Inline data лимит:** 20 MB (текст + промпты + все медиа)
+- **Максимум изображений:** 3,600 на запрос
+- **Можно миксовать:** Множественные изображения + аудио в одном запросе
+
+**Вывод:** Для 30-минутного видео с оптимизацией влезаем в лимиты:
+
+- 10 кадров × 70 KB WEBP = **0.7 MB**
+- Аудио 30 мин Vorbis = **12 MB**
+- **Итого: ~12.7 MB** ✅ (остается запас)
+
+## Архитектура MVP
+
+### Структура модулей
+
+```
+utils/
+├── media_frame_extractor.py  # НОВЫЙ: Универсальный для GIF + Video
+│   ├── extract_frames()      # Работает с GIF и Video
+│   ├── resize_image()        # Переиспользуем из gif_processor
+│   └── convert_to_webp()     # In-memory конвертация
+│
+├── audio_extractor.py        # Извлечение и конвертация аудио
+│   ├── extract_audio()       # In-memory через BytesIO
+│   └── estimate_audio_size() # Расчет размера без конвертации
+│
+└── gif_processor.py          # Существующий - НЕ меняем
+    └── (логика остается для обратной совместимости)
+
+tools/
+└── video_analyzer.py         # MCP tool для анализа видео
+    ├── analyze_video()       # Основной метод
+    └── estimate_request_size() # Dry-run для расчета размера
+
+models/
+└── analysis.py               # + VideoAnalysisResponse
+```
+
+**Ключевые принципы:**
+
+1. **Переиспользование:** Логика `gif_processor` адаптируется для видео
+2. **In-memory:** Все конвертации через BytesIO/PIL без временных файлов
+3. **Dry-run:** Расчет размера запроса БЕЗ реальной обработки
+
+### Ключевые компоненты
+
+#### 1. `utils/media_frame_extractor.py` (Универсальный)
+
+**Функционал:**
+
+- **Три режима извлечения** (как в `gif_processor.py`):
+  - `mode="total"` - N кадров равномерно по всему видео (по умолчанию)
+  - `mode="fps"` - X кадров в секунду
+  - `mode="interval"` - кадр каждые X секунд
+- Конвертация в PIL.Image
+- Resize до заданного разрешения (по умолчанию 1080p)
+- **In-memory конвертация** в WEBP через BytesIO
+- Возврат base64 без временных файлов
+
+**API:**
+
+```python
+def extract_frames(
+    source: str | Image.Image,  # Video path или GIF Image
+    mode: Literal["fps", "total", "interval"] = "total",
+    
+    # Параметры для каждого режима
+    frame_count: Optional[int] = 10,  # Для mode="total"
+    fps: Optional[float] = None,      # Для mode="fps"
+    interval_sec: Optional[float] = None,  # Для mode="interval"
+    
+    # Параметры качества
+    max_dimension: int = 1080,  # 1080p по умолчанию
+    output_format: Literal["webp", "jpeg", "png"] = "webp",
+    quality: int = 80
+) -> tuple[list[str], dict]:
+    """Extract and optimize frames from video or GIF.
+    
+    Returns:
+        (frames_base64, metadata)
+        metadata = {
+            'frame_count': int,
+            'total_size_mb': float,
+            'avg_frame_size_kb': float,
+            'resolution': str  # e.g., "1920x1080"
+        }
+    """
+```
+
+**Использует:** `imageio-ffmpeg` для видео, существующий код для GIF
+
+#### 2. `utils/audio_extractor.py`
+
+**Функционал:**
+
+- Извлечение аудиодорожки из видео
+- **In-memory конвертация** в mono Vorbis через BytesIO
+- Выбор битрейта (64/32/24 kbps)
+- Обрезка по длительности (опционально)
+- Предварительный расчет размера БЕЗ конвертации
+
+**API:**
+
+```python
+def extract_audio_from_video(
+    video_path: str,
+    bitrate: Literal[64, 32, 24] = 64,  # kbps
+    max_duration_sec: Optional[int] = None,  # Обрезать если нужно
+    dry_run: bool = False  # Только расчет размера
+) -> dict:
+    """Extract and optimize audio track (in-memory).
+    
+    Returns:
+        {
+            'base64': str,          # Только если dry_run=False
+            'mime_type': 'audio/ogg',
+            'duration_sec': float,
+            'size_mb': float,
+            'bitrate': int,
+            'channels': 1  # mono
+        }
+    """
+
+def estimate_audio_size(
+    duration_sec: float,
+    bitrate: int = 64
+) -> float:
+    """Быстрый расчет размера без обработки файла.
+    
+    Returns:
+        Size in MB
+    """
+    return (duration_sec * bitrate * 1000 / 8) / (1024 * 1024)
+```
+
+**Использует:** `pydub` поверх `imageio-ffmpeg`, все через BytesIO
+
+#### 3. `tools/video_analyzer.py`
+
+**MCP Tool с полной гибкостью:**
+
+```python
+@mcp.tool()
+async def analyze_video(
+    video_path: str,
+    prompt: str = "Analyze this video content",
+    
+    # Frame extraction modes (КАК В GIF!)
+    frame_mode: Literal["fps", "total", "interval"] = "total",
+    frame_count: Optional[int] = 10,      # Для mode="total"
+    fps: Optional[float] = None,          # Для mode="fps" (0.0167 = 1 кадр/мин)
+    interval_sec: Optional[float] = None, # Для mode="interval"
+    
+    # Frame quality
+    max_dimension: int = 1080,  # 1080p по умолчанию
+    image_format: Literal["webp", "jpeg"] = "webp",
+    image_quality: int = 80,
+    
+    # Audio options
+    include_audio: bool = True,
+    audio_bitrate: Literal[64, 32, 24] = 64,  # kbps
+    
+    # Utility
+    dry_run: bool = False,  # Только расчет размера, без запроса
+    
+    # Model
+    model: str = DEFAULT_GEMINI_MODEL
+) -> str:
+    """Analyze video as frames + audio in one request.
+    
+    Args:
+        frame_mode: Режим извлечения кадров
+            - "total": N кадров равномерно (по умолчанию)
+            - "fps": X кадров в секунду
+            - "interval": кадр каждые X секунд
+        dry_run: Если True, вернет только оценку размера без отправки
+    
+    Returns:
+        JSON с VideoAnalysisResponse или (если dry_run) размер запроса
+    """
+```
+
+**Workflow:**
+
+1. **Если dry_run=True:**
+   - Быстро рассчитать размеры кадров и аудио
+   - Вернуть оценку БЕЗ обработки
+   - Показать fits_in_limit (< 20 MB)
+
+2. **Иначе (нормальный режим):**
+   - Извлечь кадры → WEBP base64 (in-memory)
+   - Извлечь аудио → Vorbis base64 (in-memory)
+   - Проверить общий размер < 20 MB
+   - Собрать `contents = [prompt, img1, img2, ..., audio]`
+   - Один запрос к Gemini
+   - Вернуть JSON с `VideoAnalysisResponse`
+
+**Пример dry-run ответа:**
+
+```json
+{
+  "estimated_size_mb": 18.5,
+  "fits_in_limit": true,
+  "frames": {
+    "count": 30,
+    "mode": "total",
+    "resolution": "1920x1080",
+    "format": "webp",
+    "total_size_mb": 3.0
+  },
+  "audio": {
+    "duration_min": 30,
+    "bitrate_kbps": 32,
+    "size_mb": 7.2
+  },
+  "recommendation": "Safe to send (38% of 20 MB limit)"
+}
+```
+
+#### 4. `models/analysis.py` (дополнение)
+
+```python
+class VideoAnalysisResponse(BaseModel):
+    """Structured response from video analysis."""
+    
+    visual_summary: str = Field(
+        ..., 
+        description="Summary of visual content across frames"
+    )
+    audio_transcription: Optional[str] = Field(
+        default=None,
+        description="Speech transcription from audio"
+    )
+    audio_description: Optional[str] = Field(
+        default=None,
+        description="Non-speech sounds (music, effects, ambient)"
+    )
+    combined_narrative: str = Field(
+        ...,
+        description="Unified story combining visual + audio"
+    )
+    key_moments: Optional[list[str]] = Field(
+        default=None,
+        description="Important events or timestamps"
+    )
+```
+
+### Переиспользование и унификация кода
+
+**Что берем из `gif_processor.py`:**
+
+- ✅ `resize_image()` - работает с любыми PIL.Image
+- ✅ `_get_total_indices()` - равномерное распределение кадров
+- ✅ `_get_fps_indices()` - кадры по FPS
+- ✅ `_get_interval_indices()` - кадры через интервал
+- ✅ `_convert_frame()` - конвертация RGB/RGBA
+- ✅ In-memory подход через PIL
+
+**Что берем из `image_tokens.py`:**
+
+- ✅ `calculate_images_tokens()` - оценка стоимости кадров
+- ✅ Формулы расчета токенов по разрешению
+- ✅ Логика подсчета для множественных изображений
+
+**Что берем из `audio_analyzer.py`:**
+
+- ✅ Логика работы с inline audio base64
+- ✅ Структура промптов для аудио-анализа
+- ✅ Формат возврата AudioAnalysisResponse
+
+**Новое:**
+
+- 🆕 Универсальный `media_frame_extractor` для GIF + Video
+- 🆕 Dry-run режим для расчета размера
+- 🆕 In-memory конвертация аудио через BytesIO
+- 🆕 Проверка лимита 20 MB перед отправкой
+
+## Ограничения MVP
+
+### Что делаем в MVP (версия 1.0)
+
+- ✅ **Три режима извлечения кадров** (как в GIF): `total`, `fps`, `interval`
+- ✅ **Гибкие настройки качества:** 1080p/720p/480p, WEBP/JPEG, битрейт 64/32/24 kbps
+- ✅ **Dry-run режим:** Расчет размера БЕЗ обработки
+- ✅ **Проверка лимита:** Автопроверка < 20 MB перед отправкой
+- ✅ **In-memory обработка:** Без временных файлов
+- ✅ **Один запрос к Gemini:** frames + audio в `contents` array
+- ✅ **Структурированный ответ:** VideoAnalysisResponse с визуалом + аудио
+- ✅ **Переиспользование кода:** Унификация с `gif_processor`
+
+### Что НЕ делаем (в версии 2.0)
+
+- ❌ Автоматическое разделение длинных видео (>20 MB) на части
+- ❌ Кеширование контекста (промпт кеш Gemini)
+- ❌ Повторные запросы с историей чата
+- ❌ Умный выбор количества кадров по содержимому
+- ❌ Детекция статичных сцен
+- ❌ Режим "только визуал" или "только аудио"
+- ❌ Извлечение кадров по конкретным timestamp
+- ❌ Сравнение кадров "до/после"
+
+### Расчеты для типовых сценариев
+
+#### Сценарий 1: Короткое динамичное видео (10 минут)
+
+**Настройки:** `mode="fps"`, `fps=0.5` (30 кадров), `max_dimension=720`, `audio_bitrate=64`
+
+- 30 кадров × 720p WEBP = **1.5 MB**
+- Аудио 10 мин × 64 kbps = **4.8 MB**
+- **Итого: ~6.3 MB** ✅ (31% лимита)
+
+**Зачем:** Динамичный контент требует больше кадров для понимания действия
+
+#### Сценарий 2: Лекция/презентация (30 минут)
+
+**Настройки:** `mode="total"`, `frame_count=30`, `max_dimension=1080`, `audio_bitrate=32`
+
+- 30 кадров × 1080p WEBP = **3 MB**
+- Аудио 30 мин × 32 kbps = **7.2 MB**
+- **Итого: ~10.2 MB** ✅ (51% лимита)
+
+**Зачем:** Статичные слайды + речь, высокое разрешение для текста, меньший битрейт аудио
+
+#### Сценарий 3: Длинная лекция (180 минут = 3 часа)
+
+**Настройки:** `mode="interval"`, `interval_sec=120` (90 кадров), `max_dimension=720`, `audio_bitrate=24`
+
+- 90 кадров × 720p WEBP = **4.5 MB**
+- Аудио 180 мин × 24 kbps = **32 MB** ❌ **НЕ ВЛЕЗАЕТ!**
+
+**Решение для версии 2.0:**
+
+- Разделить на 2 части по 90 минут
+- Или обрабатывать только выбранные фрагменты
+- Или использовать File API вместо inline
+
+#### Сценарий 4: Природа/общий план (20 минут)
+
+**Настройки:** `mode="total"`, `frame_count=20`, `max_dimension=480`, `audio_bitrate=32`
+
+- 20 кадров × 480p WEBP = **0.5 MB**
+- Аудио 20 мин × 32 kbps = **4.8 MB**
+- **Итого: ~5.3 MB** ✅ (26% лимита)
+
+**Зачем:** Общий план не требует деталей, экономия размера
+
+## План развития
+
+### Версия 1.0 (MVP) - Что реализуем СЕЙЧАС
+
+**Основной функционал:**
+
+- ✅ Три режима извлечения кадров: `total`, `fps`, `interval`
+- ✅ Гибкие настройки: разрешение (1080p/720p/480p), формат (WEBP/JPEG), битрейт (64/32/24)
+- ✅ Dry-run: Расчет размера БЕЗ обработки
+- ✅ Проверка лимита 20 MB
+- ✅ In-memory конвертация
+- ✅ Один запрос к Gemini
+- ✅ Структурированный ответ (VideoAnalysisResponse)
+
+**Унификация с GIF:**
+
+- ✅ Переиспользование `resize_image()`, логики индексов
+- ✅ Те же режимы и параметры
+- ✅ Унифицированный `media_frame_extractor`
+
+**Лимиты MVP:**
+
+- Видео до ~30-60 минут (зависит от битрейта аудио)
+- Проверка < 20 MB перед отправкой
+- Рекомендация использовать dry-run для длинных видео
+
+### Версия 2.0 (Будущее)
+
+**Обработка длинных видео (>20 MB):**
+
+- Автоматическое разделение на части
+- Кеширование контекста (промпт кеш Gemini для экономии)
+- Последовательные запросы с накоплением контекста
+- Режим "streaming analysis" для очень длинных видео
+
+**Умная оптимизация:**
+
+- Автовыбор параметров по метаданным видео (длительность, разрешение)
+- Детекция сцен: меньше кадров для статичных участков
+- Adaptive quality: высокое разрешение только для кадров с текстом
+- Анализ аудио для выбора битрейта (речь vs музыка)
+
+**Расширенные режимы:**
+
+- Режим `timestamps`: кадры в конкретные моменты `[30.0, 120.5, 300.0]`
+- Режим `scenes`: автодетект смены сцен
+- Режим "visual-only": без аудио (экономия размера)
+- Режим "audio-only": только транскрипция
+- Режим "compare": два кадра до/после
+
+**Интеграция с File API:**
+
+- Для видео >20 MB использовать File API вместо inline
+- Комбинированный режим: кадры inline + аудио через File API
+
+## Установка зависимостей
+
+### Автоматическая установка (MVP)
+
+```bash
+pip install imageio-ffmpeg pydub pillow
+```
+
+`imageio-ffmpeg` автоматически загрузит ffmpeg бинарник при первом использовании.
+
+### Продвинутая установка (системный ffmpeg)
+
+Для лучшей производительности и свежей версии ffmpeg:
+
+**macOS:**
+
+```bash
+brew install ffmpeg
+```
+
+**Windows (через winget):**
+
+```powershell
+winget install ffmpeg
+```
+
+**Windows (через Chocolatey):**
+
+```powershell
+choco install ffmpeg
+```
+
+**Linux (Debian/Ubuntu):**
+
+```bash
+sudo apt-get update
+sudo apt-get install ffmpeg
+```
+
+**Linux (Fedora):**
+
+```bash
+sudo dnf install ffmpeg
+```
+
+**Linux (Arch):**
+
+```bash
+sudo pacman -S ffmpeg
+```
+
+## Итоги
+
+### Принятые решения
+
+1. **Зависимости:** `imageio-ffmpeg` (автоматический ffmpeg) + `pydub`
+2. **Форматы изображений:**
+   - По умолчанию: **1080p WEBP quality 80**
+   - Всегда конвертируем в WEBP (даже если источник JPEG/PNG)
+   - Опции: 1080p/720p/480p, WEBP/JPEG
+3. **Форматы аудио:**
+   - По умолчанию: **64 kbps Vorbis mono**
+   - Опции: 64/32/24 kbps
+   - 24 kbps = нормально понятно для речи (не "неразборчиво"!)
+4. **Режимы извлечения кадров:**
+   - Три режима как в GIF: `total`, `fps`, `interval`
+   - По умолчанию: `mode="total"`, 10 кадров
+5. **Лимит 20 MB:**
+   - Источник: официальная документация Gemini `image_understanding.md`
+   - Проверка перед отправкой
+   - Dry-run для предварительного расчета
+6. **In-memory обработка:**
+   - Все конвертации через BytesIO/PIL
+   - Никаких временных файлов (как в `gif_processor`)
+7. **Архитектура:**
+   - Унифицированный `media_frame_extractor` для GIF + Video
+   - Переиспользование логики из `gif_processor`, `image_tokens`, `audio_analyzer`
+8. **API:**
+   - Один MCP tool `analyze_video` с полной гибкостью
+   - Dry-run опция для "игры" с параметрами
+9. **Multimodal:** Один запрос с frames + audio в `contents` array
+
+### Почему этот подход (а не нативное Video API)?
+
+**Наш кейс:** Видео-лекции 10-30 минут с возможным мелким текстом на слайдах.
+
+**Преимущества frames+audio:**
+
+- Полный контроль над качеством кадров (читаемость текста)
+- Гибкая оптимизация размера (WEBP, Vorbis)
+- Переиспользование кода GIF-анализатора
+- Не зависит от ограничений Video API (1 FPS, auto-resolution)
+
+**Компромисс:** Чуть сложнее в реализации, но больше контроля и экономии.
+
+### Следующие шаги реализации
+
+**Фаза 1: Подготовка (унификация)**
+
+1. ✅ Проработана архитектура, форматы, лимиты
+2. ⏭️ Создать `utils/media_frame_extractor.py`
+   - Унифицировать логику для GIF + Video
+   - Три режима: `total`, `fps`, `interval`
+   - In-memory WEBP конвертация
+   - Возврат metadata с размерами
+
+**Фаза 2: Аудио**
+
+3. ⏭️ Создать `utils/audio_extractor.py`
+   - In-memory Vorbis конвертация (BytesIO)
+   - Три битрейта: 64/32/24 kbps
+   - Dry-run режим
+   - Функция `estimate_audio_size()`
+
+**Фаза 3: MCP Tool**
+
+4. ⏭️ Добавить `VideoAnalysisResponse` в `models/analysis.py`
+   - visual_summary, audio_transcription, combined_narrative
+5. ⏭️ Создать `tools/video_analyzer.py`
+   - Основная логика `analyze_video()`
+   - Dry-run для расчета размера
+   - Проверка < 20 MB
+   - Сборка multimodal запроса
+
+**Фаза 4: Тестирование**
+
+6. ⏭️ Обновить `requirements.txt` (imageio-ffmpeg, pydub)
+7. ⏭️ Создать тестовые видео разной длительности
+8. ⏭️ Протестировать все режимы и настройки
+9. ⏭️ Проверить работу dry-run
+10. ⏭️ Замерить реальные размеры vs расчеты
+
+**Фаза 5: Документация**
+
+11. ⏭️ Написать примеры использования для docs/
+12. ⏭️ Обновить README с примерами видео-анализа
+13. ⏭️ Задокументировать все параметры и режимы
+
+## Результаты исследований и подтверждения
+
+### ✅ Подтвержденные факты о Gemini API
+
+#### 1. **Multimodal запросы поддерживаются**
+- Gemini API поддерживает одновременную отправку **текста + изображений + аудио** в одном запросе
+- Используется метод `client.models.generate_content()` с массивом `contents`
+- Пример структуры: `contents = [text_prompt, image_part, audio_part, ...]`
+- **Техническая реализация:** `types.Part.from_bytes(data, mime_type)`
+
+#### 2. **Лимит 20MB подтвержден официально**
+- **"The maximum total request size is 20 MB, which includes text prompts, system instructions, and all files provided inline"** (официальная документация Gemini API)
+- Лимит включает: текст + промпты + системные инструкции + все inline медиа
+- **Подтверждено сообществом:** разработчики сталкиваются с этим лимитом при работе с аудиофайлами >20MB
+
+#### 3. **File API для больших файлов**
+- Для файлов >20MB рекомендуется использовать `client.files.upload()`
+- Подход: `f = client.files.upload(file=path)` затем `contents=[f, prompt]`
+- **Сообщество использует** этот подход для обработки больших аудиофайлов встреч
+
+#### 4. **Поддерживаемые форматы**
+- **Изображения:** PNG, JPEG, WEBP, HEIC, HEIF
+- **Аудио:** Vorbis (OGG), MP3 и другие форматы
+- **MIME types:** `image/jpeg`, `image/png`, `image/webp`, `audio/*`, `video/*`
+
+### 🔍 Источники подтверждения
+
+#### Официальная документация:
+- Google AI for Developers: "Image understanding | Gemini API"
+- Firebase AI Logic: "Supported input files and requirements"
+- BytePlus: "Gemini Image Limit: Upload & Size Restrictions 2025"
+
+#### Сообщество разработчиков:
+- **Google AI Developers Forum:** Обсуждение работы с множественными аудиофайлами >20MB
+- **DEV Community:** Подтверждение поддержки multimodality в Gemini API
+- **Bubble Forum:** Вопросы по интеграции Gemini Pro с множественными изображениями
+
+### 🎯 Ключевые выводы для реализации
+
+1. **Технически возможно:** Отправка нескольких изображений + аудио в одном запросе
+2. **Лимит 20MB реальный:** Нужно учитывать при расчете размера запроса
+3. **File API решение:** Для видео >30-60 минут (зависит от битрейта аудио)
+4. **Сообщество подтверждает:** Этот подход используется в реальных проектах
+
+### 📊 Рекомендации на основе исследований
+
+- **Для видео до 30 минут:** Использовать inline подход с оптимизацией (WEBP + Vorbis 32kbps)
+- **Для видео >30 минут:** Рассмотреть File API для аудио или разделение на части
+- **Всегда использовать dry-run:** Для предварительной проверки размера запроса
+- **Оптимальный баланс:** 30 кадров 1080p WEBP + 30 минут аудио 32kbps = ~10.2 MB (51% лимита)
+
+**Итог:** Подход frames+audio технически корректен, подтвержден документацией и сообществом, и готов к реализации.
