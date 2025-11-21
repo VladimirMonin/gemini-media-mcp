@@ -109,13 +109,18 @@ async def analyze_gif(
         )
     """
     try:
-        logger.info(f"Starting GIF analysis: {image_path}")
-        logger.info(f"Mode: {mode}, Quality: {quality}, Model: {model}")
+        logger.info("=" * 80)
+        logger.info(f"🎬 GIF ANALYSIS STARTED: {image_path}")
+        logger.info(f"📊 Parameters: mode={mode}, quality={quality}, model={model}")
+        logger.info(
+            f"🔧 Extraction: frame_count={frame_count}, gif_fps={gif_fps}, interval_sec={interval_sec}"
+        )
 
         # Load GIF
         image = Image.open(image_path)
 
         if not getattr(image, "is_animated", False):
+            logger.warning(f"❌ File is not animated: {image_path}")
             return {
                 "error": "File is not an animated GIF",
                 "suggestion": "Use 'analyze_image' tool for static images",
@@ -130,7 +135,7 @@ async def analyze_gif(
             interval_sec=interval_sec,
         )
 
-        logger.info(f"Extracted {len(frames)} frames")
+        logger.info(f"✅ Extracted {len(frames)} frames from animation")
 
         # Resize frames based on quality preset
         max_dimension = GIF_QUALITY_PRESETS.get(quality, 1920)
@@ -138,10 +143,14 @@ async def analyze_gif(
 
         # Calculate tokens using centralized module
         token_info = calculate_images_tokens(processed_frames)
-        logger.info(f"Token breakdown:\n{token_info['breakdown']}")
+        logger.info(f"💰 Token calculation:\n{token_info['breakdown']}")
 
         # Estimate cost
         cost_info = estimate_cost(token_info["total_tokens"], model)
+        logger.info(
+            f"💵 Estimated cost: ${cost_info['estimated_input_cost_usd']:.6f} USD "
+            f"({token_info['total_tokens']:,} tokens @ {model})"
+        )
 
         # Create extraction info for prompt
         if mode == "fps":
@@ -163,7 +172,7 @@ async def analyze_gif(
         )
 
         # Call Gemini API with multi-image method
-        logger.info(f"Sending {len(processed_frames)} frames to Gemini ({model})...")
+        logger.info(f"🚀 Sending {len(processed_frames)} frames to Gemini ({model})...")
         client = GeminiClient(model_name=model)
 
         response_text = client.generate_content_multi_image(
@@ -172,7 +181,12 @@ async def analyze_gif(
             temperature=0.7,
         )
 
-        logger.info("Analysis completed successfully")
+        logger.info(f"✅ Analysis completed successfully for {image_path}")
+        logger.info(
+            f"📈 Summary: {len(frames)} frames, {token_info['total_tokens']:,} tokens, "
+            f"${cost_info['estimated_input_cost_usd']:.6f} USD"
+        )
+        logger.info("=" * 80)
 
         return {
             "analysis": response_text,
@@ -192,7 +206,7 @@ async def analyze_gif(
         }
 
     except FileNotFoundError:
-        logger.error(f"File not found: {image_path}")
+        logger.error(f"❌ File not found: {image_path}")
         return {
             "error": "File not found",
             "path": image_path,
