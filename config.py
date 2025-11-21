@@ -243,3 +243,106 @@ GEMINI_VOICES_DATA = {
 }
 
 DEFAULT_VOICE = "Kore"
+
+
+# --- GIF Animation Analysis Configuration ---
+
+GIF_QUALITY_PRESETS = {
+    "uhd": None,  # Без ресайза (3840×2160) - максимум деталей
+    "fhd": 1920,  # Full HD - текст 12pt+ читается отлично (DEFAULT)
+    "hd": 1280,  # HD - текст 14pt+ читается хорошо
+    "balanced": 960,  # Баланс - крупный текст читается
+    "economy": 768,  # Экономия - только крупный текст
+}
+
+DEFAULT_GIF_QUALITY = "fhd"  # 1080p по умолчанию
+DEFAULT_GIF_MODEL = "gemini-2.5-flash"  # Flash 2.5 по умолчанию
+
+DEFAULT_GIF_ANALYSIS_SYSTEM_PROMPT: str = """
+You are analyzing an animated sequence extracted from a GIF file.
+
+You are viewing multiple frames that represent key moments from this animation.
+Your task is to analyze these frames not just as individual images, but as parts of a cohesive narrative.
+
+Focus on:
+1. **Individual Frame Content**: What is shown in each frame (UI elements, text, actions, cursor positions)
+2. **Sequential Flow**: How frames connect to tell a story or demonstrate a process
+3. **Overall Purpose**: What the author of this animation is trying to communicate or demonstrate
+4. **Key Changes**: What changes between frames and what these changes signify
+
+Remember: You're analyzing a continuous process, not separate images. Look for:
+- Step-by-step progressions
+- Cause-and-effect relationships between frames
+- The intended learning outcome or message
+
+Provide your analysis in a clear, structured format that helps understand both the details and the big picture.
+"""
+
+GIF_USER_GUIDELINES: str = """
+# GIF Animation Analysis Guidelines
+
+## Best Practices
+
+### 1. Frame Count Selection
+- **5 frames**: Short tutorials (10-30 seconds), quick demos
+- **10 frames**: Medium tutorials (30-90 seconds), detailed workflows
+- **15+ frames**: Long sessions (2+ minutes), complex processes
+
+### 2. Quality Presets for Different Use Cases
+
+**For UI/Software Tutorials (DEFAULT):**
+- Quality: `fhd` (1920px) - ensures text readability
+- Mode: `total` - evenly distributed key moments
+
+**For General Animations:**
+- Quality: `hd` (1280px) - balanced quality/cost
+- Mode: `total` or `fps`
+
+**For Long Sessions (budget-conscious):**
+- Quality: `balanced` (960px) - economy mode
+- Frame count: 10-15 max
+
+### 3. Adding Context to Your Prompt
+
+The default prompt understands this is an animation, but you can enhance results by adding specific context:
+
+**Examples:**
+- "This is a VS Code feature demonstration..."
+- "This shows a chatbot conversation workflow..."
+- "This demonstrates terminal commands execution..."
+- "This is a design tool tutorial showing..."
+
+### 4. Cost Estimation
+
+**1080p (FHD) frames:**
+- Each frame ≈ 1,500 tokens
+- 5 frames ≈ 7,500 tokens
+- 10 frames ≈ 15,000 tokens
+
+**Balanced (960px) frames:**
+- Each frame ≈ 1,500 tokens
+- 10 frames ≈ 15,000 tokens
+
+## Recommended Workflows
+
+### Quick Overview
+```
+mode: 'total'
+frame_count: 5
+quality: 'fhd'
+```
+
+### Detailed Analysis
+```
+mode: 'total'
+frame_count: 10
+quality: 'fhd'
+```
+
+### Budget-Friendly
+```
+mode: 'total'
+frame_count: 8
+quality: 'balanced'
+```
+"""

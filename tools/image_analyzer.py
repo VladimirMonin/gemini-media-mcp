@@ -1,6 +1,7 @@
 """Image analysis tool for the Gemini Media MCP server."""
 
 import json
+from PIL import Image
 from config import (
     AVAILABLE_IMAGE_ANALYSIS_PROMPTS,
     DEFAULT_GEMINI_MODEL,
@@ -10,6 +11,7 @@ from models.analysis import ErrorResponse, ImageAnalysisResponse
 from utils.file_utils import is_image_valid
 from utils.gemini_client import GeminiClient
 from utils.logger import get_logger
+from utils.image_tokens import calculate_image_tokens, estimate_cost
 
 logger = get_logger(__name__)
 
@@ -68,16 +70,18 @@ def analyze_image(
 
     Returns:
         Structured analysis response with alt-text and detailed analysis.
-        
+
     Raises:
         ValueError: If image is invalid or system instruction not found.
         FileNotFoundError: If image file or system instruction file not found.
         IOError: If error reading files.
     """
-    logger.info(f"Starting image analysis: {image_path}")
+    logger.info("=" * 80)
+    logger.info(f"🖼️  IMAGE ANALYSIS STARTED: {image_path}")
 
     # Валидация изображения
     if not is_image_valid(image_path):
+        logger.error(f"❌ Invalid image format: {image_path}")
         raise ValueError(f"File is not a supported image: {image_path}")
 
     # Получение системной инструкции
@@ -109,8 +113,27 @@ def analyze_image(
             f"Available models: {GEMINI_MODELS}"
         )
 
+    logger.info(
+        f"📊 Parameters: model={final_model_name}, system_instruction={system_instruction_name}"
+    )
+
+    # Calculate tokens for image
+    try:
+        image = Image.open(image_path)
+        tokens = calculate_image_tokens(image)
+        cost_info = estimate_cost(tokens, final_model_name)
+        logger.info(f"💰 Token estimate: {tokens:,} tokens")
+        logger.info(
+            f"💵 Estimated cost: ${cost_info['estimated_input_cost_usd']:.6f} USD"
+        )
+    except Exception as e:
+        logger.warning(f"⚠️  Could not calculate tokens: {e}")
+        tokens = None
+        cost_info = None
+
     # Инициализация клиента и анализ
     try:
+        logger.info(f"🚀 Sending request to Gemini ({final_model_name})...")
         gemini_client = GeminiClient(model_name=final_model_name)
         response_text = gemini_client.generate_content(
             prompt=user_prompt,
@@ -118,22 +141,31 @@ def analyze_image(
             system_instruction=system_instruction,
             response_schema=ImageAnalysisResponse,
         )
-        
+
         try:
             result_dict = json.loads(response_text)
             result = ImageAnalysisResponse(**result_dict)
-            logger.info("Analysis completed successfully")
+            logger.info(f"✅ Analysis completed successfully for {image_path}")
+            if tokens and cost_info:
+                logger.info(
+                    f"📈 Summary: {tokens:,} tokens, ${cost_info['estimated_input_cost_usd']:.6f} USD"
+                )
+            logger.info("=" * 80)
             return result
         except (json.JSONDecodeError, TypeError) as e:
-            logger.error(f"Failed to parse JSON response: {e}")
+            logger.error(f"❌ Failed to parse JSON response: {e}")
+            logger.error("=" * 80)
             return ErrorResponse(
                 error="JSON parsing error",
                 details=str(e),
                 raw_response=response_text,
             )
-            
+
     except Exception as e:
-        logger.exception(f"Failed to analyze image with model {final_model_name}: {e}")
+        logger.exception(
+            f"❌ Failed to analyze image with model {final_model_name}: {e}"
+        )
+        logger.error("=" * 80)
         return ErrorResponse(
             error="Image analysis failed",
             details=str(e),

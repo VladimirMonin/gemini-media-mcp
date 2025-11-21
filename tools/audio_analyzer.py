@@ -2,7 +2,6 @@
 
 import json
 import os
-from typing import Optional
 
 from config import (
     AVAILABLE_AUDIO_ANALYSIS_PROMPTS,
@@ -76,29 +75,38 @@ def analyze_audio(
 
     Returns:
         Structured analysis response or error response.
-        
+
     Raises:
         ValueError: If audio file is invalid or system instruction not found.
         FileNotFoundError: If audio file or system instruction file not found.
         IOError: If error reading files.
     """
-    logger.info(f"Starting audio analysis: {audio_path}")
+    logger.info("=" * 80)
+    logger.info(f"🎵 AUDIO ANALYSIS STARTED: {audio_path}")
 
     # Validate audio file exists
     if not os.path.exists(audio_path):
+        logger.error(f"❌ Audio file not found: {audio_path}")
         raise FileNotFoundError(f"Audio file not found at {audio_path}")
 
     # Validate file size
     file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+    logger.info(f"📁 File size: {file_size_mb:.2f} MB")
     if file_size_mb > MAX_FILE_SIZE_MB:
+        logger.error(
+            f"❌ File size exceeds limit: {file_size_mb:.2f} MB > {MAX_FILE_SIZE_MB} MB"
+        )
         raise ValueError(
             f"File size ({file_size_mb:.2f} MB) exceeds the limit of {MAX_FILE_SIZE_MB} MB."
         )
 
     # Validate audio format
     import mimetypes
+
     mime_type, _ = mimetypes.guess_type(audio_path)
+    logger.info(f"🎧 Format: {mime_type}")
     if mime_type not in SUPPORTED_AUDIO_FORMATS:
+        logger.error(f"❌ Unsupported format: {mime_type}")
         raise ValueError(
             f"Unsupported audio format: {mime_type}. "
             f"Supported formats: {list(SUPPORTED_AUDIO_FORMATS.keys())}"
@@ -134,14 +142,21 @@ def analyze_audio(
             f"Available models: {GEMINI_MODELS}"
         )
 
+    logger.info(
+        f"📊 Parameters: model={final_model_name}, system_instruction={system_instruction_name}"
+    )
+
     # Initialize client and perform analysis
     try:
+        logger.info(
+            f"🚀 Sending {file_size_mb:.2f} MB audio to Gemini ({final_model_name})..."
+        )
         gemini_client = GeminiClient(model_name=final_model_name)
-        
+
         # Read audio file as bytes
         with open(audio_path, "rb") as audio_file:
             audio_bytes = audio_file.read()
-        
+
         response_text = gemini_client.generate_content(
             prompt=user_prompt,
             media_bytes=audio_bytes,
@@ -149,23 +164,31 @@ def analyze_audio(
             system_instruction=system_instruction,
             response_schema=AudioAnalysisResponse,
         )
-        
+
         # Parse and validate response using Pydantic
         try:
             result_dict = json.loads(response_text)
             result = AudioAnalysisResponse(**result_dict)
-            logger.info("Audio analysis completed successfully")
+            logger.info(f"✅ Audio analysis completed successfully for {audio_path}")
+            logger.info(
+                f"📈 Summary: {file_size_mb:.2f} MB audio processed with {final_model_name}"
+            )
+            logger.info("=" * 80)
             return result
         except (json.JSONDecodeError, TypeError) as e:
-            logger.error(f"Failed to parse JSON response: {e}")
+            logger.error(f"❌ Failed to parse JSON response: {e}")
+            logger.error("=" * 80)
             return ErrorResponse(
                 error="JSON parsing error",
                 details=str(e),
                 raw_response=response_text,
             )
-            
+
     except Exception as e:
-        logger.exception(f"Failed to analyze audio with model {final_model_name}: {e}")
+        logger.exception(
+            f"❌ Failed to analyze audio with model {final_model_name}: {e}"
+        )
+        logger.error("=" * 80)
         return ErrorResponse(
             error="Audio analysis failed",
             details=str(e),
