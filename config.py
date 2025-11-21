@@ -346,3 +346,37 @@ frame_count: 8
 quality: 'balanced'
 ```
 """
+
+
+# --- Video Analysis Configuration ---
+
+# Video quality presets (max_dimension values)
+VIDEO_QUALITY_PRESETS = {
+    "uhd": 3840,  # 4K UHD
+    "fhd": 1920,  # 1080p Full HD (default)
+    "hd": 1280,  # 720p HD
+    "sd": 720,  # SD quality
+    "economy": 480,  # Low quality for economy
+}
+
+DEFAULT_VIDEO_QUALITY = "fhd"  # 1080p по умолчанию
+DEFAULT_VIDEO_MODEL = "gemini-2.5-flash"  # Flash 2.5 по умолчанию
+
+# Supported video formats (common video containers)
+SUPPORTED_VIDEO_FORMATS = {
+    "video/mp4": "MP4",
+    "video/mpeg": "MPEG",
+    "video/quicktime": "MOV",
+    "video/x-msvideo": "AVI",
+    "video/x-matroska": "MKV",
+    "video/webm": "WEBM",
+}
+
+# Audio bitrate presets for video (kbps)
+VIDEO_AUDIO_BITRATES = {
+    "high": 64,  # Best quality for speech + music
+    "medium": 32,  # Good for speech (default)
+    "low": 24,  # Acceptable for speech only
+}
+
+DEFAULT_VIDEO_AUDIO_BITRATE = 64  # kbps
