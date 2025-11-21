@@ -79,6 +79,135 @@ Available preset prompts in `config.py`:
 }
 ```
 
+## GIF Animation Analysis
+
+### Basic GIF Analysis (Recommended Settings)
+
+Analyze UI tutorials, software demos, or any animated GIF with intelligent frame sampling:
+
+```json
+{
+  "image_path": "/path/to/tutorial.gif",
+  "prompt": "This is a VS Code feature demo. Describe each step.",
+  "frame_count": 5,
+  "quality": "fhd"
+}
+```
+
+**Default settings:**
+
+- **Mode:** `total` - evenly distributed frames
+- **Frame count:** 5 frames (adjustable: 5-15+)
+- **Quality:** `fhd` (1920px) - best for text readability
+- **Model:** `gemini-2.5-flash`
+
+### Frame Extraction Modes
+
+#### 1. Total Mode (Recommended)
+
+Extract fixed number of evenly distributed frames - perfect for UI tutorials:
+
+```json
+{
+  "image_path": "/path/to/animation.gif",
+  "mode": "total",
+  "frame_count": 10,
+  "quality": "fhd"
+}
+```
+
+**Use cases:**
+
+- 5 frames: Quick demos (10-30s)
+- 10 frames: Detailed tutorials (30-90s)
+- 15+ frames: Long sessions (2+ min)
+
+#### 2. FPS Mode
+
+Extract frames at specified rate (frames per second):
+
+```json
+{
+  "image_path": "/path/to/animation.gif",
+  "mode": "fps",
+  "gif_fps": 1.0,
+  "quality": "hd"
+}
+```
+
+**Example:** `gif_fps: 1.0` = 1 frame every second
+
+#### 3. Interval Mode
+
+Extract frames at fixed time intervals:
+
+```json
+{
+  "image_path": "/path/to/long_session.gif",
+  "mode": "interval",
+  "interval_sec": 5.0,
+  "quality": "balanced"
+}
+```
+
+**Example:** `interval_sec: 5.0` = one frame every 5 seconds
+
+### Quality Presets
+
+Choose quality based on your needs:
+
+| Preset | Resolution | Best For | Token Cost |
+|--------|------------|----------|------------|
+| `fhd` | 1920px | UI tutorials with text (DEFAULT) | ~1,500/frame |
+| `hd` | 1280px | General animations | ~1,000/frame |
+| `balanced` | 960px | Budget-friendly | ~800/frame |
+| `economy` | 768px | Minimal quality | ~600/frame |
+| `uhd` | Original | Maximum detail | Varies |
+
+### Advanced GIF Analysis
+
+Add context to improve results:
+
+```json
+{
+  "image_path": "/path/to/demo.gif",
+  "prompt": "This demonstrates a chatbot conversation workflow. Analyze the user interaction patterns and UI responses.",
+  "mode": "total",
+  "frame_count": 8,
+  "quality": "fhd",
+  "model": "gemini-2.5-flash"
+}
+```
+
+### Getting Guidelines
+
+Get comprehensive usage guidelines and best practices:
+
+```python
+get_gif_guidelines()
+```
+
+Returns detailed information about:
+
+- Frame count selection
+- Quality preset recommendations
+- Cost estimation
+- Recommended workflows
+- Example use cases
+
+### Cost Estimation
+
+**1080p (FHD) frames:**
+
+- 5 frames ≈ 7,500 tokens
+- 10 frames ≈ 15,000 tokens
+
+**Balanced (960px) frames:**
+
+- 10 frames ≈ 8,000 tokens
+
+**Tip:** Use `get_gif_guidelines()` for detailed cost breakdown and recommendations.
+
 ## Audio Analysis
 
 ### Basic Audio Analysis
@@ -115,7 +244,8 @@ Available preset prompts in `config.py`:
 
 ## Supported Formats
 
-- **Images:** JPEG, PNG, GIF, WEBP, HEIC, HEIF (Max size: 20 MB)
+- **Images:** JPEG, PNG, GIF (static), WEBP, HEIC, HEIF (Max size: 20 MB)
+- **GIF Animations:** Animated GIF files (processed frame-by-frame)
 - **Audio:** MP3, WAV, AIFF, AAC, OGG, FLAC (Max size: 19.5 MB)
 
 ## Parameters Reference
