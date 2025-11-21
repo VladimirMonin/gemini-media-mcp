@@ -40,6 +40,7 @@ try:
         get_audio_generation_guide,
     )
     from tools.gif_analyzer import analyze_gif, get_gif_guidelines
+    from tools.video_analyzer import analyze_video
 except ImportError as e:
     logger.error(f"Failed to import tools: {e}")
     sys.exit(1)
@@ -62,6 +63,8 @@ mcp.tool()(analyze_gif)
 logger.info(f"Tool '{analyze_gif.__name__}' registered successfully.")
 mcp.tool()(get_gif_guidelines)
 logger.info(f"Tool '{get_gif_guidelines.__name__}' registered successfully.")
+mcp.tool()(analyze_video)
+logger.info(f"Tool '{analyze_video.__name__}' registered successfully.")
 
 
 if __name__ == "__main__":
