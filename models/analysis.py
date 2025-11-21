@@ -54,10 +54,51 @@ class ErrorResponse(BaseModel):
 class AudioAnalysisResponse(BaseModel):
     """Structured response from Gemini audio analysis."""
 
-    title: Optional[str] = Field(default=None, description="Suggested title for the audio.")
-    summary: Optional[str] = Field(default=None, description="Brief summary of the audio content.")
-    transcription: Optional[str] = Field(default=None, description="Full transcription of the audio.")
-    participants: Optional[list[str]] = Field(default=None, description="List of identified participants.")
-    hashtags: Optional[list[str]] = Field(default=None, description="Keywords or topics as hashtags.")
-    action_items: Optional[list[str]] = Field(default=None, description="List of action items mentioned.")
+    title: Optional[str] = Field(
+        default=None, description="Suggested title for the audio."
+    )
+    summary: Optional[str] = Field(
+        default=None, description="Brief summary of the audio content."
+    )
+    transcription: Optional[str] = Field(
+        default=None, description="Full transcription of the audio."
+    )
+    participants: Optional[list[str]] = Field(
+        default=None, description="List of identified participants."
+    )
+    hashtags: Optional[list[str]] = Field(
+        default=None, description="Keywords or topics as hashtags."
+    )
+    action_items: Optional[list[str]] = Field(
+        default=None, description="List of action items mentioned."
+    )
     raw_text: str = Field(..., description="Raw text response from the model.")
+
+
+class VideoAnalysisResponse(BaseModel):
+    """Structured response from video analysis (frames + audio)."""
+
+    visual_summary: str = Field(
+        ...,
+        description="Summary of visual content across all analyzed frames.",
+    )
+    audio_transcription: Optional[str] = Field(
+        default=None,
+        description="Full transcription of speech from audio track.",
+    )
+    audio_description: Optional[str] = Field(
+        default=None,
+        description="Description of non-speech audio: music, sound effects, ambient sounds.",
+    )
+    combined_narrative: str = Field(
+        ...,
+        description="Unified narrative combining visual and audio analysis into coherent story.",
+    )
+    key_moments: Optional[list[str]] = Field(
+        default=None,
+        description="List of important events, timestamps, or turning points in the video.",
+    )
+    raw_text: str = Field(
+        ...,
+        description="Raw text response from the model.",
+    )
