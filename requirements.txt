@@ -7,8 +7,10 @@ pydantic>=2.0.0
 PyYAML>=6.0.0
 
 # Video and audio processing
+imageio>=2.0.0
 imageio-ffmpeg>=0.5.0
 pydub>=0.25.1
+audioop-lts>=0.2.1  # Required for pydub on Python 3.13+
 
 # Testing dependencies
 pytest>=7.0.0
