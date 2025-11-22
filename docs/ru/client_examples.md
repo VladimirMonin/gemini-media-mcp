@@ -215,10 +215,11 @@ Write-Host "$PWD\server.py"
 2. **Проверьте регистрацию сервера:**
    - Откройте чат Cline
    - Найдите "gemini-media-analyzer" в доступных MCP серверах
-   - Вы должны увидеть 7 зарегистрированных инструментов:
+   - Вы должны увидеть 8 зарегистрированных инструментов:
      - `analyze_image`
      - `analyze_gif`
      - `analyze_audio`
+     - `analyze_video`
      - `generate_image`
      - `generate_audio_from_yaml`
      - `get_gif_guidelines`
@@ -247,6 +248,7 @@ python server.py
 ```
 Tool 'analyze_image' registered successfully.
 Tool 'analyze_audio' registered successfully.
+Tool 'analyze_video' registered successfully.
 Tool 'generate_image' registered successfully.
 Tool 'generate_audio_from_yaml' registered successfully.
 Tool 'get_audio_generation_guide' registered successfully.
