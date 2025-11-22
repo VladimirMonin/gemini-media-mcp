@@ -77,6 +77,7 @@ MCP (Model Context Protocol) сервер для анализа изображе
 **Использование:**
 
 - [Базовое использование](docs/ru/usage.md)
+- [Анализ видео](docs/ru/video-analysis.md)
 - [Решение проблем](docs/ru/troubleshooting.md)
 - [Частые ошибки](docs/ru/common-issues.md)
 
