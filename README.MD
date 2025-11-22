@@ -25,10 +25,11 @@ Model Context Protocol (MCP) server for analyzing images, audio, and video using
 - **Image Analysis** - AI-powered image descriptions
 - **GIF Animation Analysis** - Frame-by-frame analysis of animated GIFs with intelligent sampling
 - **Audio Analysis** - Recognition and transcription of audio files
-- **Image Generation** - Create images from text and reference images
+- **Video Analysis** - Frame-by-frame video analysis with audio transcription
+- **Image Generation** - Create images from text and reference images using Gemini 2.5 Flash and Gemini 3 Pro
 - **Audio Generation** - Multi-speaker audio from YAML scripts
 - **Flexible Prompts** - Custom system prompts
-- **Multiple Models** - Gemini 2.5 Flash, Pro, Flash Lite, and Image Preview
+- **Multiple Models** - Gemini 2.5 (Flash, Pro, Flash Lite) and Gemini 3 Pro for image generation
 - **Privacy First** - Runs locally with your API key
 
 ### Documentation
@@ -58,10 +59,11 @@ MCP (Model Context Protocol) сервер для анализа изображе
 - **Анализ изображений** - ИИ описания изображений
 - **Анализ GIF-анимаций** - Покадровый анализ анимированных GIF с умной выборкой кадров
 - **Анализ аудио** - Распознавание и транскрипция аудиофайлов
-- **Генерация изображений** - Создание изображений по тексту и референсам
+- **Анализ видео** - Покадровый анализ видео с транскрипцией аудио
+- **Генерация изображений** - Создание изображений по тексту и референсам с помощью Gemini 2.5 Flash и Gemini 3 Pro
 - **Генерация аудио** - Многоголосое аудио из YAML сценариев
 - **Гибкие промпты** - Настраиваемые системные промпты
-- **Несколько моделей** - Gemini 2.5 Flash, Pro и новая Flash Lite
+- **Несколько моделей** - Gemini 2.5 (Flash, Pro, Flash Lite) и Gemini 3 Pro для генерации изображений
 - **Конфиденциальность** - Работает локально с вашим ключом
 
 ### Документация
@@ -75,6 +77,7 @@ MCP (Model Context Protocol) сервер для анализа изображе
 **Использование:**
 
 - [Базовое использование](docs/ru/usage.md)
+- [Анализ видео](docs/ru/video-analysis.md)
 - [Решение проблем](docs/ru/troubleshooting.md)
 - [Частые ошибки](docs/ru/common-issues.md)
 
@@ -139,9 +142,9 @@ gemini-media-mcp/
 
 ## Future Plans
 
-- Video analysis (frame-by-frame)
 - Advanced GIF processing features
 - Batch media processing
+- Web search integration with Google Search API
 
 ---
 

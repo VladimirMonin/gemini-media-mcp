@@ -215,10 +215,11 @@ After adding the configuration:
 2. **Check server registration:**
    - Open Cline chat
    - Look for "gemini-media-analyzer" in available MCP servers
-   - You should see 7 registered tools:
+   - You should see 8 registered tools:
      - `analyze_image`
      - `analyze_gif`
      - `analyze_audio`
+     - `analyze_video`
      - `generate_image`
      - `generate_audio_from_yaml`
      - `get_gif_guidelines`
@@ -247,6 +248,7 @@ You should see:
 ```
 Tool 'analyze_image' registered successfully.
 Tool 'analyze_audio' registered successfully.
+Tool 'analyze_video' registered successfully.
 Tool 'generate_image' registered successfully.
 Tool 'generate_audio_from_yaml' registered successfully.
 Tool 'get_audio_generation_guide' registered successfully.
