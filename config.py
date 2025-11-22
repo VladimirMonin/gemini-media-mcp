@@ -380,3 +380,35 @@ VIDEO_AUDIO_BITRATES = {
 }
 
 DEFAULT_VIDEO_AUDIO_BITRATE = 64  # kbps
+
+
+# --- Image Generation Configuration ---
+
+# Доступные модели.
+# Gemini 3 Pro лучше для сложных задач, текста и высокого разрешения.
+# Flash быстрее и дешевле, но ограничен разрешением 1024px.
+IMAGE_GEN_MODELS = {
+    "fast": "gemini-2.5-flash-image",
+    "pro": "gemini-3-pro-image-preview",
+}
+
+DEFAULT_IMAGE_GEN_MODEL = "fast"
+
+# Допустимые соотношения сторон
+# Flash и Pro поддерживают этот набор.
+VALID_ASPECT_RATIOS = [
+    "1:1",
+    "3:4",
+    "4:3",
+    "9:16",
+    "16:9",
+    "2:3",
+    "3:2",
+    "4:5",
+    "5:4",
+    "21:9",
+]
+
+# Допустимые разрешения
+# ВАЖНО: Flash поддерживает только 1K. 2K и 4K доступны только в Pro.
+VALID_RESOLUTIONS = ["1K", "2K", "4K"]
