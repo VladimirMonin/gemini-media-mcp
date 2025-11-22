@@ -70,7 +70,7 @@ The image generation tool supports two models with different capabilities:
 
 ```json
 {
-  "user_prompt": "A cat wearing a hat, pixel art style",
+  "prompt": "A cat wearing a hat, pixel art style",
   "output_path": "/path/to/save/cat.png"
 }
 ```
@@ -79,7 +79,7 @@ The image generation tool supports two models with different capabilities:
 
 ```json
 {
-  "user_prompt": "A futuristic city with neon signs at night, cyberpunk style",
+  "prompt": "A futuristic city with neon signs at night, cyberpunk style",
   "output_path": "/path/to/save/city.png",
   "model_type": "pro",
   "resolution": "2K",
@@ -93,7 +93,7 @@ The image generation tool supports two models with different capabilities:
 
 ```json
 {
-  "user_prompt": "Create a similar image in cyberpunk style",
+  "prompt": "Create a similar image in cyberpunk style",
   "image_paths": ["/path/to/reference1.jpg", "/path/to/reference2.png"],
   "output_path": "/path/to/save/result.png"
 }
@@ -103,7 +103,7 @@ The image generation tool supports two models with different capabilities:
 
 ```json
 {
-  "user_prompt": "Combine these elements into a professional product photo",
+  "prompt": "Combine these elements into a professional product photo",
   "image_paths": [
     "/path/to/product.jpg",
     "/path/to/background.jpg",
@@ -121,7 +121,7 @@ The image generation tool supports two models with different capabilities:
 
 ```json
 {
-  "user_prompt": "Da Vinci style anatomical sketch of a butterfly",
+  "prompt": "Da Vinci style anatomical sketch of a butterfly",
   "output_path": "/path/to/save/butterfly.png",
   "model_type": "pro",
   "resolution": "4K",
@@ -133,7 +133,7 @@ The image generation tool supports two models with different capabilities:
 
 ```json
 {
-  "user_prompt": "A modern tech company logo with the text 'AI Studio' in a clean sans-serif font",
+  "prompt": "A modern tech company logo with the text 'AI Studio' in a clean sans-serif font",
   "output_path": "/path/to/save/logo.png",
   "model_type": "pro",
   "resolution": "2K"
@@ -154,7 +154,7 @@ Available aspect ratios for both models:
 
 ```json
 {
-  "user_prompt": "Panoramic mountain landscape at sunset",
+  "prompt": "Panoramic mountain landscape at sunset",
   "output_path": "/path/to/save/panorama.png",
   "aspect_ratio": "21:9"
 }
@@ -164,7 +164,7 @@ Available aspect ratios for both models:
 
 ```json
 {
-  "user_prompt": "Futuristic city with neon lights",
+  "prompt": "Futuristic city with neon lights",
   "output_path": "/path/to/save/image.png"
 }
 ```
