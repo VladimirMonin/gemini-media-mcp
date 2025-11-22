@@ -60,7 +60,7 @@ The image generation tool supports two models with different capabilities:
 | Model | Speed | Resolution | Quality | Best For |
 |-------|-------|------------|---------|----------|
 | **fast** (gemini-2.5-flash-image) | ⚡ Fast | 1K only | Good | Quick drafts, iterations, speed priority |
-| **pro** (gemini-3-pro-image-preview) | 🎨 Slower | 1K, 2K, 4K | Excellent | High-quality art, precise text rendering, complex scenes |
+| **pro** (gemini-3-pro-image-preview) | 🎨 Slower | 1K, 2K | Excellent | High-quality art, precise text rendering, complex scenes |
 
 **Default:** `fast` model for most use cases.
 
@@ -117,14 +117,14 @@ The image generation tool supports two models with different capabilities:
 
 ### Advanced Features (Pro Model)
 
-**4K Resolution Output:**
+**2K Resolution Output:**
 
 ```json
 {
   "prompt": "Da Vinci style anatomical sketch of a butterfly",
   "output_path": "/path/to/save/butterfly.png",
   "model_type": "pro",
-  "resolution": "4K",
+  "resolution": "2K",
   "aspect_ratio": "1:1"
 }
 ```
@@ -359,7 +359,7 @@ Returns detailed information about:
 | `output_path` | string | ✅ | Absolute path where to save the generated image. Examples: Windows: "C:/Users/User/Desktop/result.png", macOS/Linux: "/Users/username/Desktop/result.png" |
 | `image_paths` | string[] | ❌ | List of absolute paths to reference images for editing/style transfer (max 5 for fast, max 14 for pro) |
 | `aspect_ratio` | string | ❌ | Output aspect ratio: '1:1', '16:9', '9:16', '4:3', '3:4', '2:3', '3:2', '4:5', '5:4', '21:9' (default: '16:9') |
-| `resolution` | string | ❌ | Output resolution: '1K', '2K', '4K'. Note: 4K only available with pro model, fast model only supports 1K (default: '1K') |
+| `resolution` | string | ❌ | Output resolution: '1K', '2K'. Note: 2K is ONLY supported when `model_type` is 'pro'. If 'fast' is selected, this will be forced to '1K' (default: '1K') |
 | `model_type` | string | ❌ | Model selection: 'fast' (gemini-2.5-flash-image) or 'pro' (gemini-3-pro-image-preview) (default: 'fast') |
 
 ### Audio Analysis
@@ -418,7 +418,7 @@ The server returns a structured JSON response based on the `ImageAnalysisRespons
 
 **Image Generation Models:**
 - `gemini-2.5-flash-image` (fast) - Quick drafts, iterations, 1K resolution only
-- `gemini-3-pro-image-preview` (pro) - High-quality art, precise text rendering, up to 4K resolution, complex scenes
+- `gemini-3-pro-image-preview` (pro) - High-quality art, precise text rendering, up to 2K resolution, complex scenes
 
 **Text-to-Speech Models:**
 - `gemini-2.5-flash-preview-tts` - Standard quality (default)
