@@ -143,8 +143,8 @@ The image generation tool supports two models with different capabilities:
 ### Aspect Ratios
 
 Available aspect ratios for both models:
-- `1:1` - Square (default)
-- `16:9` - Widescreen landscape
+- `1:1` - Square
+- `16:9` - Widescreen landscape (default)
 - `9:16` - Vertical portrait
 - `4:3` - Classic landscape
 - `3:4` - Classic portrait
