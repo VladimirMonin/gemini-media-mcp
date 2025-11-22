@@ -356,7 +356,7 @@ Returns detailed information about:
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `prompt` | string | ✅ | Text description for image generation (use detailed, descriptive English prompts) |
-| `output_path` | string | ✅ | Absolute path where to save the generated image (e.g., "C:/Users/User/Desktop/result.png") |
+| `output_path` | string | ✅ | Absolute path where to save the generated image. Examples: Windows: "C:/Users/User/Desktop/result.png", macOS/Linux: "/Users/username/Desktop/result.png" |
 | `image_paths` | string[] | ❌ | List of absolute paths to reference images for editing/style transfer (max 5 for fast, max 14 for pro) |
 | `aspect_ratio` | string | ❌ | Output aspect ratio: '1:1', '16:9', '9:16', '4:3', '3:4', '2:3', '3:2', '4:5', '5:4', '21:9' (default: '16:9') |
 | `resolution` | string | ❌ | Output resolution: '1K', '2K', '4K'. Note: 4K only available with pro model, fast model only supports 1K (default: '1K') |
