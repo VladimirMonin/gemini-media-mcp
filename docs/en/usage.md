@@ -53,20 +53,110 @@ Available preset prompts in `config.py`:
 
 ## Image Generation
 
+### Model Selection
+
+The image generation tool supports two models with different capabilities:
+
+| Model | Speed | Resolution | Quality | Best For |
+|-------|-------|------------|---------|----------|
+| **fast** (gemini-2.5-flash-image) | ⚡ Fast | 1K only | Good | Quick drafts, iterations, speed priority |
+| **pro** (gemini-3-pro-image-preview) | 🎨 Slower | 1K, 2K, 4K | Excellent | High-quality art, precise text rendering, complex scenes |
+
+**Default:** `fast` model for most use cases.
+
 ### Text-to-Image Generation
+
+**Basic generation (fast model):**
 
 ```json
 {
-  "user_prompt": "A cat wearing a hat, pixel art style"
+  "user_prompt": "A cat wearing a hat, pixel art style",
+  "output_path": "/path/to/save/cat.png"
+}
+```
+
+**High-quality generation (pro model):**
+
+```json
+{
+  "user_prompt": "A futuristic city with neon signs at night, cyberpunk style",
+  "output_path": "/path/to/save/city.png",
+  "model_type": "pro",
+  "resolution": "2K",
+  "aspect_ratio": "16:9"
 }
 ```
 
 ### Text+Image(s)-to-Image Generation
 
+**Image editing/style transfer:**
+
 ```json
 {
   "user_prompt": "Create a similar image in cyberpunk style",
-  "image_paths": ["/path/to/reference1.jpg", "/path/to/reference2.png"]
+  "image_paths": ["/path/to/reference1.jpg", "/path/to/reference2.png"],
+  "output_path": "/path/to/save/result.png"
+}
+```
+
+**Pro model with multiple references (up to 14 images):**
+
+```json
+{
+  "user_prompt": "Combine these elements into a professional product photo",
+  "image_paths": [
+    "/path/to/product.jpg",
+    "/path/to/background.jpg",
+    "/path/to/lighting_ref.jpg"
+  ],
+  "output_path": "/path/to/save/composite.png",
+  "model_type": "pro",
+  "resolution": "2K"
+}
+```
+
+### Advanced Features (Pro Model)
+
+**4K Resolution Output:**
+
+```json
+{
+  "user_prompt": "Da Vinci style anatomical sketch of a butterfly",
+  "output_path": "/path/to/save/butterfly.png",
+  "model_type": "pro",
+  "resolution": "4K",
+  "aspect_ratio": "1:1"
+}
+```
+
+**Precise Text Rendering:**
+
+```json
+{
+  "user_prompt": "A modern tech company logo with the text 'AI Studio' in a clean sans-serif font",
+  "output_path": "/path/to/save/logo.png",
+  "model_type": "pro",
+  "resolution": "2K"
+}
+```
+
+### Aspect Ratios
+
+Available aspect ratios for both models:
+- `1:1` - Square (default)
+- `16:9` - Widescreen landscape
+- `9:16` - Vertical portrait
+- `4:3` - Classic landscape
+- `3:4` - Classic portrait
+- `2:3`, `3:2`, `4:5`, `5:4`, `21:9` - Specialized ratios
+
+**Example:**
+
+```json
+{
+  "user_prompt": "Panoramic mountain landscape at sunset",
+  "output_path": "/path/to/save/panorama.png",
+  "aspect_ratio": "21:9"
 }
 ```
 
@@ -265,9 +355,12 @@ Returns detailed information about:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `user_prompt` | string | ✅ | Text description for image generation |
-| `image_paths` | string[] | ❌ | List of absolute paths to reference images |
-| `output_path` | string | ❌ | Path to save the generated image |
+| `prompt` | string | ✅ | Text description for image generation (use detailed, descriptive English prompts) |
+| `output_path` | string | ✅ | Absolute path where to save the generated image (e.g., "C:/Users/User/Desktop/result.png") |
+| `image_paths` | string[] | ❌ | List of absolute paths to reference images for editing/style transfer (max 5 for fast, max 14 for pro) |
+| `aspect_ratio` | string | ❌ | Output aspect ratio: '1:1', '16:9', '9:16', '4:3', '3:4', '2:3', '3:2', '4:5', '5:4', '21:9' (default: '16:9') |
+| `resolution` | string | ❌ | Output resolution: '1K', '2K', '4K'. Note: 4K only available with pro model, fast model only supports 1K (default: '1K') |
+| `model_type` | string | ❌ | Model selection: 'fast' (gemini-2.5-flash-image) or 'pro' (gemini-3-pro-image-preview) (default: 'fast') |
 
 ### Audio Analysis
 
@@ -318,12 +411,18 @@ The server returns a structured JSON response based on the `ImageAnalysisRespons
 
 ## Available Models
 
+**Analysis Models:**
 - `gemini-2.5-flash-lite` - Fast and efficient (default)
 - `gemini-2.5-flash` - Balanced performance
 - `gemini-2.5-pro` - Highest quality
-- `gemini-2.5-flash-image-preview` - Image generation model
-- `gemini-2.5-flash-preview-tts` - Text-to-speech model (default)
-- `gemini-2.5-pro-preview-tts` - Premium quality text-to-speech model
+
+**Image Generation Models:**
+- `gemini-2.5-flash-image` (fast) - Quick drafts, iterations, 1K resolution only
+- `gemini-3-pro-image-preview` (pro) - High-quality art, precise text rendering, up to 4K resolution, complex scenes
+
+**Text-to-Speech Models:**
+- `gemini-2.5-flash-preview-tts` - Standard quality (default)
+- `gemini-2.5-pro-preview-tts` - Premium quality
 
 ## Audio Generation
 

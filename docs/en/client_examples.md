@@ -1,6 +1,6 @@
-# Cline Client Configuration Example
+# MCP Client Configuration Examples
 
-This document provides configuration examples for the Cline client. Other MCP clients may have different configuration formats.
+This document provides configuration examples for MCP clients including Cline, VS Code Native, and Qwen CLI. Other MCP clients may have different configuration formats.
 
 ## Configuration File Location
 
@@ -177,10 +177,18 @@ Write-Host "$PWD\server.py"
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `command` | string | **Full path** to Python interpreter in virtual environment |
-| `args` | array | Path to `server.py` file |
+| `args` | array | Path to `server.py` file (include `-u` flag for unbuffered output) |
 | `env.GEMINI_API_KEY` | string | Your Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey) |
 | `autoApprove` | array | Tools that don't require manual approval (see warning below) |
-| `timeout` | number | Maximum execution time in seconds (default: 600 for media processing) |
+| `timeout` | number | **CRITICAL:** Maximum execution time. **Seconds** for VS Code/Cline (600 = 10 min), **Milliseconds** for Qwen CLI (120000 = 2 min) |
+
+## Timeout Configuration by Client
+
+| Client | Unit | Example Value | Real Time |
+|--------|------|---------------|-----------|
+| **Cline** | Seconds | 600 | 10 minutes |
+| **VS Code Native** | Seconds | 600 | 10 minutes |
+| **Qwen CLI** | **Milliseconds** | 120000 | 2 minutes |
 
 ## Platform-Specific Notes
 
@@ -245,6 +253,106 @@ Tool 'get_audio_generation_guide' registered successfully.
 Tool 'analyze_gif' registered successfully.
 Tool 'get_gif_guidelines' registered successfully.
 ```
+
+## Qwen CLI Configuration
+
+Qwen CLI is a Node.js-based MCP client that requires special attention to timeout configuration.
+
+### Configuration File Location
+
+Create or edit `.qwen/settings.json` in your project root or `~/.qwen/settings.json` globally.
+
+### ⚠️ CRITICAL: Timeout Configuration
+
+**Qwen CLI uses milliseconds for timeouts, NOT seconds!**
+
+This is different from VS Code and Cline (which use seconds). If you use a small number like 600, Qwen will wait only 0.6 seconds and report that the tool was not found.
+
+**Recommended timeout: 120000 milliseconds = 2 minutes**
+
+### Qwen CLI Configuration Example (Windows)
+
+```json
+{
+  "mcpServers": {
+    "gemini-media-analyzer": {
+      "command": "C:/Projects/gemini-media-mcp/.venv/Scripts/python.exe",
+      "args": [
+        "-u",
+        "C:/Projects/gemini-media-mcp/server.py"
+      ],
+      "env": {
+        "GEMINI_API_KEY": "your_gemini_api_key_here",
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "autoApprove": [
+        "analyze_image",
+        "analyze_audio",
+        "get_gif_guidelines",
+        "get_audio_generation_guide"
+      ],
+      "disabled": false,
+      "type": "stdio",
+      "timeout": 120000
+    }
+  }
+}
+```
+
+### Important Qwen CLI Notes
+
+1. **Always use forward slashes `/` in paths**, even on Windows (e.g., `C:/Projects/...` not `C:\Projects\...`)
+2. **Timeout is in milliseconds**: 120000 = 120,000 milliseconds = 2 minutes
+3. **Include `-u` argument** and `PYTHONUNBUFFERED` environment variable for proper output buffering
+4. **Add `type: "stdio"`** field for Qwen CLI compatibility
+
+### Why such a large timeout?
+
+Python servers with ML libraries (NumPy, Pillow, etc.) can take significant time to start. A 2-minute timeout ensures the server has enough time to initialize properly, especially on the first run.
+
+## VS Code Native MCP Support
+
+VS Code has built-in MCP support that appears in the sidebar or integrates with Copilot.
+
+### Configuration File Location
+
+**Windows:** `%APPDATA%\Code\User\profiles\{Profile_ID}\mcp.json` (or in main User folder for single profile)
+**macOS/Linux:** `~/Library/Application Support/Code/User/profiles/{Profile_ID}/mcp.json`
+
+### VS Code Native Configuration Example (Windows)
+
+```json
+{
+  "servers": {
+    "gemini-media-analyzer": {
+      "command": "C:/Projects/gemini-media-mcp/.venv/Scripts/python.exe",
+      "args": [
+        "-u",
+        "C:/Projects/gemini-media-mcp/server.py"
+      ],
+      "env": {
+        "GEMINI_API_KEY": "your_gemini_api_key_here",
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "autoApprove": [],
+      "disabled": false,
+      "timeout": 600
+    }
+  },
+  "$version": 1
+}
+```
+
+### VS Code Native Notes
+
+1. **Root object is `"servers"`**, not `"mcpServers"` (different from Cline/Qwen)
+2. **Timeout is in seconds**: 600 = 10 minutes
+3. **Requires window reload** after configuration changes
+4. **Strict JSON validation** - make sure the structure is exactly correct
 
 ## ⚠️ Important Security and Cost Warnings
 
