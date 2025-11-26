@@ -140,7 +140,16 @@ AVAILABLE_AUDIO_ANALYSIS_PROMPTS = {
 
 # Get project root directory (where config.py is located)
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_AUDIO_DIR = os.path.join(_PROJECT_ROOT, "output_audio")
+
+# Output directories (old and new structure)
+OUTPUT_AUDIO_DIR = os.path.join(_PROJECT_ROOT, "output_audio")  # Legacy location
+OUTPUT_DIR = os.path.join(_PROJECT_ROOT, "output")
+OUTPUT_IMAGES_DIR = os.path.join(OUTPUT_DIR, "images")
+OUTPUT_AUDIO_DIR_NEW = os.path.join(OUTPUT_DIR, "audio")
+
+# Create backup directories
+os.makedirs(OUTPUT_IMAGES_DIR, exist_ok=True)
+os.makedirs(OUTPUT_AUDIO_DIR_NEW, exist_ok=True)
 
 # Полный каталог голосов с метаданными для выбора ИИ
 GEMINI_VOICES_DATA = {

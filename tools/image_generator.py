@@ -1,6 +1,7 @@
 """Image generation tool for the Gemini Media MCP server."""
 
 import os
+from datetime import datetime
 from typing import List, Optional, Literal
 from PIL import Image
 from google import genai
@@ -12,8 +13,10 @@ from config import (
     DEFAULT_IMAGE_GEN_MODEL,
     VALID_ASPECT_RATIOS,
     VALID_RESOLUTIONS,
+    OUTPUT_IMAGES_DIR,
 )
 from utils.logger import get_logger
+from utils.backup_manager import backup_generation
 
 logger = get_logger(__name__)
 
@@ -201,6 +204,30 @@ def generate_image(
             f.write(image_bytes)
 
         logger.info(f"✅ Image successfully saved to: {final_path}")
+
+        # --- Backup to output/images/ with metadata ---
+        try:
+            backup_metadata = {
+                "timestamp": datetime.now().isoformat(),
+                "file_path": final_path,
+                "parameters": {
+                    "prompt": prompt,
+                    "model_type": model_type,
+                    "model": selected_model,
+                    "aspect_ratio": aspect_ratio,
+                    "resolution": resolution,
+                    "reference_images": image_paths if image_paths else None,
+                },
+            }
+            backup_path, metadata_path = backup_generation(
+                original_path=final_path,
+                file_type="image",
+                metadata=backup_metadata,
+            )
+            logger.info(f"📦 Backup created: {backup_path}")
+        except Exception as backup_error:
+            logger.warning(f"⚠️ Backup failed (non-critical): {backup_error}")
+
         return final_path
 
     except Exception as e:

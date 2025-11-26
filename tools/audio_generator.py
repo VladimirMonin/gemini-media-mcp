@@ -4,8 +4,15 @@ import wave
 from typing import List, Dict, Any, Tuple, Optional
 from google import genai
 from google.genai import types
-from config import GEMINI_API_KEY, GEMINI_VOICES_DATA, DEFAULT_VOICE, OUTPUT_AUDIO_DIR
+from config import (
+    GEMINI_API_KEY,
+    GEMINI_VOICES_DATA,
+    DEFAULT_VOICE,
+    OUTPUT_AUDIO_DIR,
+    OUTPUT_AUDIO_DIR_NEW,
+)
 from utils.logger import get_logger
+from utils.backup_manager import backup_generation
 
 logger = get_logger(__name__)
 
@@ -256,6 +263,42 @@ def generate_audio_from_yaml(
             final_output_path = os.path.join(OUTPUT_AUDIO_DIR, f"{base_name}.wav")
 
         save_wave_file(final_output_path, part.inline_data.data)
+
+        logger.info(f"✅ Audio successfully saved to: {final_output_path}")
+
+        # --- Backup to output/audio/ with metadata ---
+        try:
+            from datetime import datetime
+
+            # Extract speakers and voices from script
+            script_data = _load_yaml_script(yaml_path)
+            speakers_info = script_data.get("speakers", {})
+            script_title = script_data.get(
+                "title", os.path.splitext(os.path.basename(yaml_path))[0]
+            )
+
+            backup_metadata = {
+                "timestamp": datetime.now().isoformat(),
+                "file_path": final_output_path,
+                "parameters": {
+                    "prompt": script_title,
+                    "yaml_script": yaml_path,
+                    "model": model,
+                    "speakers": speakers_info,
+                    "voices_used": list(speakers_info.values())
+                    if speakers_info
+                    else [],
+                },
+            }
+
+            backup_path, metadata_path = backup_generation(
+                original_path=final_output_path,
+                file_type="audio",
+                metadata=backup_metadata,
+            )
+            logger.info(f"📦 Backup created: {backup_path}")
+        except Exception as backup_error:
+            logger.warning(f"⚠️ Backup failed (non-critical): {backup_error}")
 
         return f"Audio generated successfully: {os.path.abspath(final_output_path)}"
 

@@ -5,7 +5,7 @@ images with custom prompts and system instructions.
 """
 
 import json
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Sequence
 
 from PIL import Image
 from google.genai import types, Client
@@ -147,7 +147,7 @@ class GeminiClient:
     def generate_content_multi_image(
         self,
         prompt: str,
-        images: List[Union[str, Image.Image, types.Part]],
+        images: Sequence[Union[str, Image.Image, types.Part]],
         system_instruction: Optional[str] = None,
         response_schema=None,
         temperature: float = 0.7,
