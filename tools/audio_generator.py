@@ -10,6 +10,7 @@ from config import (
     DEFAULT_VOICE,
     OUTPUT_AUDIO_DIR,
     OUTPUT_AUDIO_DIR_NEW,
+    validate_model_for_tier,
 )
 from utils.logger import get_logger
 from utils.backup_manager import backup_generation
@@ -171,6 +172,18 @@ def generate_audio_from_yaml(
     ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
     If JSON Schema shows different parameter names, ALWAYS use what's documented here.
 
+    ⚠️ TIER REQUIREMENTS & RATE LIMITS:
+    - **Free Tier**: 3 RPM (requests per minute) - Very limited! Use carefully.
+    - **Tier 1**: 10 RPM - Better for production use.
+    
+    Both tiers support both TTS models, but Free tier's 3 RPM limit means you should:
+    - Batch multiple utterances into single YAML scripts
+    - Avoid frequent small requests
+    - Consider upgrading to Tier 1 for real-time or high-volume applications
+    
+    To configure your tier, set GEMINI_TIER=tier1 in your .env file.
+    See https://ai.google.dev/pricing for tier details.
+
     Args:
         yaml_path: Absolute path to the YAML file.
         model: Gemini TTS model to use.
@@ -181,6 +194,13 @@ def generate_audio_from_yaml(
                      If not provided, saves to output_audio/<script_name>.wav in project root.
     """
     try:
+        # 0. Tier Validation (CRITICAL for Free tier: only 3 RPM!)
+        # Проверяем доступность TTS на текущем tier и модели
+        is_available, error_message = validate_model_for_tier(model, "audio_tts")
+        if not is_available:
+            logger.error(f"❌ {error_message}")
+            raise ValueError(error_message)
+
         # 1. Load and Validate
         data = _load_yaml_script(yaml_path)
         cast = data.get("cast", [])

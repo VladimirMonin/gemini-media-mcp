@@ -14,6 +14,7 @@ from config import (
     VALID_ASPECT_RATIOS,
     VALID_RESOLUTIONS,
     OUTPUT_IMAGES_DIR,
+    validate_model_for_tier,
 )
 from utils.logger import get_logger
 from utils.backup_manager import backup_generation
@@ -41,6 +42,13 @@ def generate_image(
 
     ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
     If JSON Schema shows different parameter names, ALWAYS use what's documented here.
+
+    ⚠️ TIER REQUIREMENTS:
+    - **Free Tier**: Image generation is NOT AVAILABLE. You must upgrade to Tier 1.
+    - **Tier 1**: Full access to all image generation models (both 'fast' and 'pro').
+    
+    To configure your tier, set GEMINI_TIER=tier1 in your .env file.
+    See https://ai.google.dev/pricing for tier details and upgrade instructions.
 
     Use this tool when the user wants to:
     1. Create an image from scratch (Text-to-Image).
@@ -74,6 +82,13 @@ def generate_image(
         f"🎨 Image Gen Request: model={model_type}, res={resolution}, ar={aspect_ratio}"
     )
     logger.info(f"💾 Target Output: {output_path}")
+
+    # --- 0.5. Tier Validation (CRITICAL for Free tier users) ---
+    # Проверяем доступность генерации изображений на текущем tier
+    is_available, error_message = validate_model_for_tier("", "image_generation")
+    if not is_available:
+        logger.error(f"❌ {error_message}")
+        raise ValueError(error_message)
 
     # --- 1. Validate Output Path (Critical) ---
     if not output_path:
