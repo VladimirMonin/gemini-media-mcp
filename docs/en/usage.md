@@ -79,6 +79,28 @@ Available preset prompts in `config.py`:
 }
 ```
 
+### Automatic Backup System
+
+All generated images and audio are automatically backed up to `output/` directory:
+
+**Structure:**
+
+```
+output/
+├── images/
+│   ├── 2025-11-26_16-30-45_futuristic_city.png
+│   └── 2025-11-26_16-30-45_futuristic_city.json  # Metadata
+└── audio/
+    ├── 2025-11-26_16-32-10_podcast_intro.wav
+    └── 2025-11-26_16-32-10_podcast_intro.json
+```
+
+**Features:**
+
+- Timestamped filenames: `YYYY-MM-DD_HH-MM-SS_description.ext`
+- JSON metadata with generation parameters (prompt, model, settings)
+- Non-blocking (won't interrupt generation if backup fails)
+
 ## GIF Animation Analysis
 
 ### Basic GIF Analysis (Recommended Settings)

@@ -27,6 +27,7 @@ Model Context Protocol (MCP) server for analyzing images, audio, and video using
 - **Audio Analysis** - Recognition and transcription of audio files
 - **Image Generation** - Create images from text and reference images
 - **Audio Generation** - Multi-speaker audio from YAML scripts
+- **Automatic Backup** - All generations saved to `output/` with timestamped metadata
 - **Flexible Prompts** - Custom system prompts
 - **Multiple Models** - Gemini 2.5 Flash, Pro, Flash Lite, and Image Preview
 - **Privacy First** - Runs locally with your API key
@@ -60,6 +61,7 @@ MCP (Model Context Protocol) сервер для анализа изображе
 - **Анализ аудио** - Распознавание и транскрипция аудиофайлов
 - **Генерация изображений** - Создание изображений по тексту и референсам
 - **Генерация аудио** - Многоголосое аудио из YAML сценариев
+- **Автоматический бэкап** - Все генерации сохраняются в `output/` с метаданными
 - **Гибкие промпты** - Настраиваемые системные промпты
 - **Несколько моделей** - Gemini 2.5 Flash, Pro и новая Flash Lite
 - **Конфиденциальность** - Работает локально с вашим ключом
