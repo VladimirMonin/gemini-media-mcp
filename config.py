@@ -52,57 +52,61 @@ GEMINI_API_KEY = get_api_key()
 def get_tier() -> str:
     """
     Получает tier пользователя из переменных окружения.
-    
+
     Поддерживаемые значения: 'free', 'tier1'
-    
+
     Returns:
         str: Tier пользователя (по умолчанию 'free')
     """
     tier = os.getenv("GEMINI_TIER", "free").lower()
     valid_tiers = ["free", "tier1"]
-    
+
     if tier not in valid_tiers:
         # Если указан некорректный tier, используем free
         return "free"
-    
+
     return tier
 
 
 GEMINI_TIER = get_tier()
 
-# Rate limits на основе tier (данные из скриншотов официальной документации Google AI)
+# Rate limits на основе tier (ТОЧНЫЕ данные из официальной документации Google AI)
 # RPM - Requests Per Minute
 # TPM - Tokens Per Minute  
 # RPD - Requests Per Day
-# Только модели, которые реально используются в проекте
 TIER_RATE_LIMITS = {
     "free": {
+        # Модели для анализа контента (image/audio/video/gif)
         "text_models": {
-            # Модели для анализа (image/audio/video/gif)
             "gemini-2.5-pro": {"rpm": 2, "tpm": 125000, "rpd": 50},
             "gemini-2.5-flash": {"rpm": 10, "tpm": 250000, "rpd": 250},
             "gemini-2.5-flash-lite": {"rpm": 15, "tpm": 250000, "rpd": 1000},
         },
-        # Генерация аудио ОЧЕНЬ ограничена на Free tier - всего 3 запроса в минуту!
-        "audio_generation": {"rpm": 3},
+        # Генерация аудио - всего 3 запроса в минуту на Free tier!
+        "audio_generation": {
+            "gemini-2.5-flash-preview-tts": {"rpm": 3, "tpm": 10000, "rpd": 15}
+        },
         # Генерация изображений НЕДОСТУПНА на Free tier
         "image_generation_available": False,
     },
     "tier1": {
+        # Модели для анализа контента + доступ к Gemini 3 Pro
         "text_models": {
-            # Модели для анализа (image/audio/video/gif)
+            "gemini-3-pro-preview": {"rpm": 50, "tpm": 1000000, "rpd": 1000},
             "gemini-2.5-pro": {"rpm": 150, "tpm": 2000000, "rpd": 10000},
             "gemini-2.5-flash": {"rpm": 1000, "tpm": 1000000, "rpd": 10000},
-            "gemini-2.5-flash-lite": {"rpm": 4000, "tpm": 4000000, "rpd": None},  # None = без лимита
+            "gemini-2.5-flash-lite": {"rpm": 4000, "tpm": 4000000, "rpd": None},
         },
-        # На Tier1 генерация аудио доступна с 10 RPM
-        "audio_generation": {"rpm": 10},
-        # Генерация изображений доступна на Tier1
+        # Генерация аудио - 2 модели доступны на Tier1
+        "audio_generation": {
+            "gemini-2.5-flash-preview-tts": {"rpm": 10, "tpm": 10000, "rpd": 100},
+            "gemini-2.5-pro-preview-tts": {"rpm": 10, "tpm": 10000, "rpd": 50},
+        },
+        # Генерация изображений ДОСТУПНА на Tier1
         "image_generation_available": True,
-        # Модели для генерации изображений (используются в image_generator.py)
         "image_models": {
-            "gemini-2.5-flash-image": {"rpm": 1000},  # fast model
-            "gemini-3-pro-image-preview": {"rpm": 50},  # pro model
+            "gemini-2.5-flash-image": {"rpm": 500, "tpm": 500000, "rpd": 2000},
+            "gemini-3-pro-image-preview": {"rpm": 20, "tpm": 100000, "rpd": 250},
         },
     },
 }
@@ -111,18 +115,18 @@ TIER_RATE_LIMITS = {
 def is_feature_available(feature: str) -> bool:
     """
     Проверяет доступность функции на текущем tier.
-    
+
     Args:
         feature: Название функции ('image_generation', 'audio_generation', и т.д.)
-        
+
     Returns:
         bool: True если функция доступна на текущем tier
     """
     tier_config = TIER_RATE_LIMITS.get(GEMINI_TIER, TIER_RATE_LIMITS["free"])
-    
+
     if feature == "image_generation":
         return tier_config.get("image_generation_available", False)
-    
+
     # Для остальных функций проверяем наличие конфигурации
     return feature in tier_config
 
@@ -130,27 +134,92 @@ def is_feature_available(feature: str) -> bool:
 def get_rate_limit(model_name: str, limit_type: str = "rpm") -> int:
     """
     Получает лимит запросов для конкретной модели на текущем tier.
-    
+
     Args:
         model_name: Название модели
         limit_type: Тип лимита ('rpm', 'tpm', 'rpd')
-        
+
     Returns:
         int: Значение лимита (или 0 если модель не найдена)
     """
     tier_config = TIER_RATE_LIMITS.get(GEMINI_TIER, TIER_RATE_LIMITS["free"])
-    
+
     # Проверяем в text_models
     if "text_models" in tier_config and model_name in tier_config["text_models"]:
-        return tier_config["text_models"][model_name].get(limit_type, 0)
-    
+        limit_value = tier_config["text_models"][model_name].get(limit_type, 0)
+        return limit_value if limit_value is not None else 0
+
+    # Проверяем в audio_generation
+    if "audio_generation" in tier_config and model_name in tier_config["audio_generation"]:
+        limit_value = tier_config["audio_generation"][model_name].get(limit_type, 0)
+        return limit_value if limit_value is not None else 0
+
+    # Проверяем в image_models
+    if "image_models" in tier_config and model_name in tier_config["image_models"]:
+        limit_value = tier_config["image_models"][model_name].get(limit_type, 0)
+        return limit_value if limit_value is not None else 0
+
     return 0
+
+
+def validate_model_for_tier(model_name: str, feature_type: str = "text") -> tuple[bool, str]:
+    """
+    Проверяет доступность модели на текущем tier.
+
+    Args:
+        model_name: Название модели
+        feature_type: Тип функции ('text', 'audio_generation', 'image_generation')
+
+    Returns:
+        tuple[bool, str]: (доступна ли модель, сообщение об ошибке если недоступна)
+    """
+    tier_config = TIER_RATE_LIMITS.get(GEMINI_TIER, TIER_RATE_LIMITS["free"])
+
+    # Проверка для text моделей
+    if feature_type == "text":
+        if "text_models" in tier_config and model_name in tier_config["text_models"]:
+            return True, ""
+        return False, (
+            f"Модель '{model_name}' недоступна на tier '{GEMINI_TIER}'. "
+            f"Для использования этой модели установите GEMINI_TIER='tier1' "
+            f"в конфигурации MCP клиента."
+        )
+
+    # Проверка для audio generation
+    if feature_type == "audio_generation":
+        if not is_feature_available("audio_generation"):
+            return False, (
+                f"Генерация аудио недоступна на tier '{GEMINI_TIER}'. "
+                f"Установите GEMINI_TIER='tier1' в env переменных MCP клиента."
+            )
+        if "audio_generation" in tier_config and model_name in tier_config["audio_generation"]:
+            return True, ""
+        return False, (
+            f"TTS модель '{model_name}' недоступна на tier '{GEMINI_TIER}'. "
+            f"Доступные модели: {list(tier_config.get('audio_generation', {}).keys())}"
+        )
+
+    # Проверка для image generation
+    if feature_type == "image_generation":
+        if not is_feature_available("image_generation"):
+            return False, (
+                "⚠️ Генерация изображений НЕДОСТУПНА на Free tier!\n"
+                "Для использования генерации изображений установите GEMINI_TIER='tier1' "
+                "в env переменных вашего MCP клиента (Claude Desktop, Cline и т.д.).\n"
+                "Инструкция: добавьте 'GEMINI_TIER': 'tier1' в секцию 'env' конфигурации сервера."
+            )
+        if "image_models" in tier_config and model_name in tier_config["image_models"]:
+            return True, ""
+        return False, f"Модель генерации изображений '{model_name}' недоступна на tier '{GEMINI_TIER}'."
+
+    return False, f"Неизвестный тип функции: {feature_type}"
 
 
 GEMINI_MODELS = [
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
     "gemini-2.5-pro",
+    "gemini-3-pro-preview",  # Доступна только на tier1
 ]
 DEFAULT_GEMINI_MODEL: str = GEMINI_MODELS[0]
 
