@@ -161,6 +161,9 @@ def generate_audio_from_yaml(
     """
     Generates audio from a local YAML script file using Gemini TTS.
 
+    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
+    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
+
     Args:
         yaml_path: Absolute path to the YAML file.
         model: Gemini TTS model to use.

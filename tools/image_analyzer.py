@@ -56,6 +56,9 @@ def analyze_image(
 ) -> ImageAnalysisResponse | ErrorResponse:
     """Analyze images using Google Gemini API.
 
+    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
+    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
+
     Returns structured result with alt-text and detailed analysis.
     Supported formats: JPEG, PNG, GIF, WEBP, HEIC, HEIF
 

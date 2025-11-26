@@ -61,6 +61,9 @@ def analyze_audio(
 ) -> AudioAnalysisResponse | ErrorResponse:
     """Analyzes an audio file using the Gemini API.
 
+    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
+    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
+
     Returns structured analysis response with title, summary, transcription,
     participants, hashtags, and action items.
 

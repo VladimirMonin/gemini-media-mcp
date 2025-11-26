@@ -11,7 +11,7 @@ from config import (
     IMAGE_GEN_MODELS,
     DEFAULT_IMAGE_GEN_MODEL,
     VALID_ASPECT_RATIOS,
-    VALID_RESOLUTIONS
+    VALID_RESOLUTIONS,
 )
 from utils.logger import get_logger
 
@@ -31,10 +31,13 @@ def generate_image(
     image_paths: Optional[List[str]] = None,
     aspect_ratio: str = "16:9",
     resolution: str = "1K",
-    model_type: Literal["fast", "pro"] = "fast"
+    model_type: Literal["fast", "pro"] = "fast",
 ) -> str:
     """
     Generate a new image from text OR edit an existing image using Google Gemini models.
+
+    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
+    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
 
     Use this tool when the user wants to:
     1. Create an image from scratch (Text-to-Image).
@@ -42,7 +45,7 @@ def generate_image(
     3. Transform the style of an image.
 
     IMPORTANT GUIDELINES FOR THE AGENT:
-    1. **Prompt Translation**: You MUST translate the user's request into a detailed, descriptive ENGLISH prompt before calling this tool. Gemini image models generally do not support non-English prompts well.
+    1. **Prompt Translation**: You MUST translate the user's request into a detailed, descriptive ENGLISH prompt before calling this tool. Gemini image models REQUIRE English prompts for best results. Non-English prompts will produce poor quality or fail.
     2. **Output Path**: You MUST provide a valid, absolute file path for `output_path`. Ask the user for a location if unclear, or determine a sensible path based on the user's environment (e.g., Desktop or project folder).
     3. **Editing**: If the user wants to edit an image, you MUST provide the absolute path to that image in `image_paths` and describe the desired result in the `prompt` (e.g., "A photo of a cat wearing a wizard hat").
     4. **Model Selection**:
@@ -64,27 +67,35 @@ def generate_image(
         str: The absolute path to the saved image file on success.
     """
     # --- 0. Pre-validation logging ---
-    logger.info(f"🎨 Image Gen Request: model={model_type}, res={resolution}, ar={aspect_ratio}")
+    logger.info(
+        f"🎨 Image Gen Request: model={model_type}, res={resolution}, ar={aspect_ratio}"
+    )
     logger.info(f"💾 Target Output: {output_path}")
-    
+
     # --- 1. Validate Output Path (Critical) ---
     if not output_path:
-        raise ValueError("output_path is missing. The agent must specify an absolute path to save the file.")
-    
+        raise ValueError(
+            "output_path is missing. The agent must specify an absolute path to save the file."
+        )
+
     final_path = _resolve_path(output_path)
-    
+
     # Check if path is a directory (it must be a file)
     if os.path.isdir(final_path):
-         raise ValueError(f"output_path '{final_path}' is a directory. Please specify a full file path including the filename (e.g., .../image.png).")
+        raise ValueError(
+            f"output_path '{final_path}' is a directory. Please specify a full file path including the filename (e.g., .../image.png)."
+        )
 
     # Ensure valid extension
-    if not final_path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+    if not final_path.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
         final_path += ".png"
         logger.info(f"🔄 Appended extension: {final_path}")
 
     # --- 2. Validate Parameters ---
     if aspect_ratio not in VALID_ASPECT_RATIOS:
-        logger.warning(f"⚠️ Invalid aspect_ratio '{aspect_ratio}'. Resetting to default '16:9'.")
+        logger.warning(
+            f"⚠️ Invalid aspect_ratio '{aspect_ratio}'. Resetting to default '16:9'."
+        )
         aspect_ratio = "16:9"
 
     if resolution not in VALID_RESOLUTIONS:
@@ -93,17 +104,21 @@ def generate_image(
 
     # API Limit Check: Flash model only supports 1K
     if model_type == "fast" and resolution != "1K":
-        logger.warning(f"⚠️ Model 'fast' (Flash) does not support {resolution}. Downgrading to 1K.")
+        logger.warning(
+            f"⚠️ Model 'fast' (Flash) does not support {resolution}. Downgrading to 1K."
+        )
         resolution = "1K"
 
     # Resolve model name from config
-    selected_model = IMAGE_GEN_MODELS.get(model_type, IMAGE_GEN_MODELS.get(DEFAULT_IMAGE_GEN_MODEL))
+    selected_model = IMAGE_GEN_MODELS.get(
+        model_type, IMAGE_GEN_MODELS.get(DEFAULT_IMAGE_GEN_MODEL)
+    )
     if not selected_model:
-        selected_model = "gemini-2.5-flash-image" # Hard fallback
+        selected_model = "gemini-2.5-flash-image"  # Hard fallback
 
     # --- 3. Prepare Content (Prompt + Images) ---
     contents = [prompt]
-    
+
     if image_paths:
         valid_images_count = 0
         for raw_path in image_paths:
@@ -119,40 +134,42 @@ def generate_image(
                     logger.error(f"❌ Failed to load reference image {path}: {e}")
             else:
                 logger.error(f"❌ Reference image not found at path: {path}")
-        
+
         # If inputs were provided but none were valid, fail fast
         if valid_images_count == 0 and image_paths:
-            raise FileNotFoundError(f"Could not load any of the provided reference images: {image_paths}")
+            raise FileNotFoundError(
+                f"Could not load any of the provided reference images: {image_paths}"
+            )
 
     # --- 4. Configure and Call API ---
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-        
+
         # Construct ImageConfig
         # Only pass image_size if strictly necessary to avoid Pydantic validation errors in SDK
         img_config_params = {"aspect_ratio": aspect_ratio}
-        
+
         if model_type == "pro" and resolution != "1K":
-             img_config_params["image_size"] = resolution
+            img_config_params["image_size"] = resolution
 
         gen_config = types.GenerateContentConfig(
-            response_modalities=["IMAGE"], # We only want the image blob
-            image_config=types.ImageConfig(**img_config_params)
+            response_modalities=["IMAGE"],  # We only want the image blob
+            image_config=types.ImageConfig(**img_config_params),
         )
 
         logger.info(f"🚀 Sending request to Gemini ({selected_model})...")
         logger.info(f"📝 Prompt (start): {prompt[:100]}...")
 
         response = client.models.generate_content(
-            model=selected_model,
-            contents=contents,
-            config=gen_config
+            model=selected_model, contents=contents, config=gen_config
         )
 
         # --- 5. Handle Response ---
         if not response.candidates:
             # Usually happens if safety filters block the request
-            raise ValueError("API returned no candidates. The prompt might have triggered safety filters.")
+            raise ValueError(
+                "API returned no candidates. The prompt might have triggered safety filters."
+            )
 
         generated_image_part = None
         # Iterate through parts to find the inline_data (image blob)
@@ -161,20 +178,22 @@ def generate_image(
                 if part.inline_data:
                     generated_image_part = part
                     break
-        
+
         if not generated_image_part:
             # Extract text error if present
             text_error = "Unknown error"
             if response.candidates[0].content and response.candidates[0].content.parts:
-                 text_part = response.candidates[0].content.parts[0]
-                 if text_part.text:
-                     text_error = text_part.text
-            
-            raise ValueError(f"Model returned text instead of an image. This often means the model refused the request. Response: {text_error}")
+                text_part = response.candidates[0].content.parts[0]
+                if text_part.text:
+                    text_error = text_part.text
+
+            raise ValueError(
+                f"Model returned text instead of an image. This often means the model refused the request. Response: {text_error}"
+            )
 
         # --- 6. Save to Disk ---
         image_bytes = generated_image_part.inline_data.data
-        
+
         # Ensure directory exists
         os.makedirs(os.path.dirname(final_path), exist_ok=True)
 

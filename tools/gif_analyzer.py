@@ -34,6 +34,10 @@ async def analyze_gif(
 ) -> dict:
     """Analyze GIF animation using Gemini AI.
 
+    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
+    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
+    For best results, provide prompts in ENGLISH.
+
     This tool extracts key frames from GIF animations and analyzes them as a cohesive sequence,
     understanding both individual frames and the overall narrative/purpose of the animation.
 

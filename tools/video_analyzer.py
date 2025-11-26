@@ -65,6 +65,10 @@ def analyze_video(
 ) -> str:
     """Analyze video as frames + audio in one multimodal request.
 
+    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
+    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
+    For best results, provide prompts in ENGLISH.
+
     Extracts video frames and audio track, optimizes them, and sends to Gemini API
     for comprehensive analysis. Supports dry-run mode to estimate request size
     before processing.
