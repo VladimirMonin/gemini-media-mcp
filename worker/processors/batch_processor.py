@@ -9,8 +9,30 @@ Batch Processor — обработка задач через Google Batch API.
 """
 
 import logging
+import os
+
+import google.genai as genai
+
+from config import GEMINI_API_KEY, get_batch_model
 
 logger = logging.getLogger("gemini-media-mcp.worker.batch_processor")
+
+# Feature flag: включить реальный Batch API или использовать моки
+ENABLE_BATCH_API = os.getenv("ENABLE_BATCH_API", "true").lower() == "true"
+
+# Инициализация клиента Google Batch API
+client = None
+if ENABLE_BATCH_API:
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        logger.info("Google Batch API client initialized (real mode)")
+    except Exception as e:
+        logger.error(f"Failed to initialize Google Batch API client: {e}")
+        logger.warning("Falling back to MOCK mode")
+        ENABLE_BATCH_API = False
+        client = None
+else:
+    logger.info("ENABLE_BATCH_API=false → using MOCK mode (no API calls)")
 
 
 def submit_pending_batches(db) -> int:
@@ -18,12 +40,12 @@ def submit_pending_batches(db) -> int:
     Фаза 1: Отправка PENDING задач в Google Batch API.
 
     Алгоритм:
-    1. Получить pending задачи (limit=100)
-    2. Отфильтровать только batch-режим
-    3. Группировать по batch_id
-    4. Для каждого batch:
-       - Сформировать inline_requests
-       - Вызвать client.batches.create()
+    1. Получить pending batches (не задачи!)
+    2. Отфильтровать только batch-режим (execution_mode='batch')
+    3. Для каждого пакета:
+       - Получить все задачи этого пакета
+       - Сформировать inline_requests из input_payload каждой задачи
+       - Вызвать client.batches.create() или mock
        - Получить google_batch_id
        - Обновить статусы (batch → SUBMITTED, tasks → SUBMITTED)
 
@@ -31,28 +53,108 @@ def submit_pending_batches(db) -> int:
         db: DatabaseManager instance
 
     Returns:
-        Количество задач, отправленных в Batch API
+        Количество отправленных пакетов
 
-    Note:
-        ЗАГЛУШКА для Фазы 2.
-        Реальная реализация будет в Фазе 3 (Batch API Integration).
+    Raises:
+        Exception: При ошибках API — пакет помечается как FAILED
     """
-    tasks = db.get_pending_tasks(limit=100)
+    # Получить pending батчи (не задачи!)
+    pending_batches = db.get_pending_batches()
 
     # Фильтр: только batch-режим
-    batch_tasks = [
-        t
-        for t in tasks
-        if db.get_operation_type(t["operation_type"])["execution_mode"] == "batch"
-    ]
+    batch_mode_batches = []
+    for batch in pending_batches:
+        # Получить первую задачу пакета, чтобы узнать operation_type
+        tasks_in_batch = [
+            t
+            for t in db.get_pending_tasks(limit=1000)
+            if t.get("batch_id") == batch["id"]
+        ]
 
-    if batch_tasks:
-        logger.info(
-            f"[MOCK] Would submit {len(batch_tasks)} batch tasks to Google Batch API"
-        )
-        # TODO Фаза 3: реальная отправка в Batch API
+        if not tasks_in_batch:
+            logger.warning(f"Batch {batch['id']} has no tasks, skipping")
+            continue
 
-    return len(batch_tasks)
+        # Проверить execution_mode через operation_type первой задачи
+        first_task = tasks_in_batch[0]
+        op_type = db.get_operation_type(first_task["operation_type"])
+
+        if op_type["execution_mode"] == "batch":
+            batch_mode_batches.append({"batch": batch, "tasks": tasks_in_batch})
+
+    submitted_count = 0
+
+    for item in batch_mode_batches:
+        batch = item["batch"]
+        tasks = item["tasks"]
+        batch_id = batch["id"]
+
+        logger.info(f"Submitting batch {batch_id} with {len(tasks)} tasks")
+
+        try:
+            if not ENABLE_BATCH_API:
+                # MOCK режим: создать фейковый google_batch_id для тестов
+                fake_google_id = f"batches/mock_{batch_id[:8]}"
+                logger.info(f"[MOCK] Created fake batch: {fake_google_id}")
+
+                # Обновить статус пакета
+                db.update_batch_status(batch_id, "SUBMITTED", fake_google_id)
+
+                # Обновить статусы всех задач в пакете
+                for task in tasks:
+                    db.update_task_status(task["id"], "SUBMITTED")
+
+                submitted_count += 1
+            else:
+                # РЕАЛЬНЫЙ режим: отправка в Google Batch API
+
+                # Формируем inline_requests из input_payload каждой задачи
+                # Note: inline режим НЕ поддерживает custom_id (только для file-based метода)
+                # Порядок результатов гарантирован для <20MB батчей (документация Google)
+                # TODO Phase 3 Step 3: Переход на file-based режим при необходимости (>20MB)
+                inline_requests = []
+                for task in tasks:
+                    input_payload = task.get("input_payload", {})
+
+                    # Для IMG_GEN_BATCH: input_payload = {"prompt": "..."}
+                    prompt = input_payload.get("prompt", "")
+
+                    request = {
+                        "contents": [{"parts": [{"text": prompt}], "role": "user"}]
+                    }
+                    inline_requests.append(request)
+
+                # Динамически выбираем модель по operation_type
+                operation_type = tasks[0]["operation_type"]
+                # Передаём input_payload первой задачи для извлечения model_type (fast/pro)
+                first_payload = tasks[0].get("input_payload", {})
+                model = get_batch_model(operation_type, first_payload)
+
+                logger.info(f"Selected model: {model} (operation: {operation_type})")
+
+                # Вызываем Batch API
+                # TODO Phase 4: Exponential backoff для transient ошибок (429, 503)
+                result = client.batches.create(model=model, src=inline_requests)
+
+                google_batch_id = result.name  # "batches/abc123xyz..."
+                logger.info(f"✅ Batch submitted: {google_batch_id}")
+
+                # Обновить статус пакета
+                db.update_batch_status(batch_id, "SUBMITTED", google_batch_id)
+
+                # Обновить статусы всех задач в пакете
+                for task in tasks:
+                    db.update_task_status(task["id"], "SUBMITTED")
+
+                submitted_count += 1
+
+        except Exception as e:
+            logger.error(f"❌ Failed to submit batch {batch_id}: {e}")
+            # Пометить пакет как FAILED (error message залогирован выше)
+            db.update_batch_status(batch_id, "FAILED")
+
+    logger.info(f"Submitted {submitted_count}/{len(batch_mode_batches)} batches")
+    return submitted_count
 
 
 def poll_active_batches(db) -> int:

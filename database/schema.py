@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS operation_types (
     description TEXT,
     execution_mode TEXT NOT NULL CHECK(execution_mode IN ('sync', 'batch', 'local_queue')),
     default_priority INTEGER DEFAULT 5,
+    rpm_limit INTEGER DEFAULT 3,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 )
 """

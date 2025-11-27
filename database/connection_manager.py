@@ -68,7 +68,7 @@ class ConnectionManager:
 
                 # Заполнить справочники
                 cursor.executemany(
-                    seed_data.INSERT_OPERATION_TYPES_QUERY,
+                    seed_data.INSERT_OPERATION_TYPES,
                     seed_data.OPERATION_TYPES_SEED,
                 )
 

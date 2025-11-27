@@ -112,6 +112,67 @@ TIER_RATE_LIMITS = {
 }
 
 
+# ============================================================================
+# Batch API Model Mapping (Фаза 3)
+# ============================================================================
+# Маппинг типов операций на модели Google Gemini для Batch API.
+# Всего ДВА типа моделей: "Кисть" (генерация) и "Мозг" (анализ).
+#
+# ВАЖНО: Для IMG_GEN_BATCH используется IMAGE_GEN_MODELS (fast/pro выбор).
+# Модель выбирается динамически из input_payload задачи (model_type: "fast"/"pro").
+
+BATCH_MODEL_MAPPING = {
+    # Группа "Генерация изображений" — динамический выбор fast/pro
+    # Ссылка на IMAGE_GEN_MODELS = {"fast": "gemini-2.5-flash-image", "pro": "gemini-3-pro-image-preview"}
+    # get_batch_model() достанет model_type из input_payload и вернёт нужную модель
+    "IMG_GEN_BATCH": "__use_image_gen_models__",  # Специальный маркер для динамического выбора
+    # Группа "Анализ и Текст" — универсальная мультимодальная модель
+    # (одна модель для всех типов контента: изображения, видео, текст)
+    "IMG_ANALYZE_BATCH": "gemini-2.5-flash",
+    "VIDEO_ANALYZE_BATCH": "gemini-2.5-flash",
+    "GIF_ANALYZE_BATCH": "gemini-2.5-flash",
+    "TEXT_GEN_BATCH": "gemini-2.5-flash",
+}
+
+
+def get_batch_model(operation_type: str, input_payload: dict = None) -> str:
+    """
+    Возвращает имя модели для Batch API по типу операции.
+
+    Для IMG_GEN_BATCH поддерживает динамический выбор fast/pro модели
+    на основе model_type из input_payload.
+
+    Args:
+        operation_type: Тип операции (например, 'IMG_GEN_BATCH')
+        input_payload: Опциональный dict с параметрами задачи (для извлечения model_type)
+
+    Returns:
+        str: Имя модели Gemini (например, 'gemini-2.5-flash-image' или 'gemini-3-pro-image-preview')
+
+    Examples:
+        >>> get_batch_model('IMG_GEN_BATCH', {'model_type': 'pro'})
+        'gemini-3-pro-image-preview'
+        >>> get_batch_model('IMG_GEN_BATCH', {'model_type': 'fast'})
+        'gemini-2.5-flash-image'
+        >>> get_batch_model('IMG_GEN_BATCH')  # Дефолт
+        'gemini-2.5-flash-image'
+        >>> get_batch_model('VIDEO_ANALYZE_BATCH')
+        'gemini-2.5-flash'
+    """
+    model = BATCH_MODEL_MAPPING.get(operation_type)
+
+    # Специальная обработка для IMG_GEN_BATCH (динамический выбор fast/pro)
+    if operation_type == "IMG_GEN_BATCH" and model == "__use_image_gen_models__":
+        if input_payload and "model_type" in input_payload:
+            model_type = input_payload["model_type"]
+            return IMAGE_GEN_MODELS.get(model_type, IMAGE_GEN_MODELS["fast"])
+        # Дефолт: fast модель
+        return IMAGE_GEN_MODELS["fast"]
+
+    # Для остальных операций возвращаем прямой маппинг
+    return model if model else "gemini-2.5-flash"
+
+
 def is_feature_available(feature: str) -> bool:
     """
     Проверяет доступность функции на текущем tier.

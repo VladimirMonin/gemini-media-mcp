@@ -179,6 +179,14 @@ class TestLocalQueueProcessing:
             ],
         )
 
+        # Патчим batch_processor для mock режима
+        import worker.processors.batch_processor as bp
+
+        original_enable = bp.ENABLE_BATCH_API
+        original_client = bp.client
+        bp.ENABLE_BATCH_API = False
+        bp.client = None
+
         # Запустить воркер
         worker = WorkerManager(temp_db, tick_interval=2)
         worker.start()
@@ -187,9 +195,18 @@ class TestLocalQueueProcessing:
 
         worker.stop(timeout=5)
 
-        # Задача должна остаться в PENDING (batch процессор - заглушка)
+        # Восстановить оригинальные значения
+        bp.ENABLE_BATCH_API = original_enable
+        bp.client = original_client
+
+        # В mock режиме batch задачи должны быть SUBMITTED через fake batch_id
         task = temp_db.get_task(task_id)
-        assert task["status"] == "PENDING"
+        batch = temp_db.get_batch(batch_id)
+
+        # Проверить, что это был mock (fake batch_id)
+        assert batch["status"] == "SUBMITTED"
+        assert batch["google_batch_id"].startswith("batches/mock_")
+        assert task["status"] == "SUBMITTED"
 
 
 class TestGracefulShutdown:

@@ -10,13 +10,13 @@ SQL запросы с плейсхолдерами для CRUD операций.
 # ============================================================================
 
 GET_OPERATION_TYPE = """
-SELECT operation_type, display_name, description, execution_mode, default_priority, created_at
+SELECT operation_type, display_name, description, execution_mode, default_priority, rpm_limit, created_at
 FROM operation_types
 WHERE operation_type = ?
 """
 
 GET_ALL_OPERATION_TYPES = """
-SELECT operation_type, display_name, description, execution_mode, default_priority, created_at
+SELECT operation_type, display_name, description, execution_mode, default_priority, rpm_limit, created_at
 FROM operation_types
 ORDER BY operation_type
 """
