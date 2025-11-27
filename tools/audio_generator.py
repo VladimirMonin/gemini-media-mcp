@@ -175,12 +175,12 @@ def generate_audio_from_yaml(
     ⚠️ TIER REQUIREMENTS & RATE LIMITS:
     - **Free Tier**: 3 RPM (requests per minute) - Very limited! Use carefully.
     - **Tier 1**: 10 RPM - Better for production use.
-    
+
     Both tiers support both TTS models, but Free tier's 3 RPM limit means you should:
     - Batch multiple utterances into single YAML scripts
     - Avoid frequent small requests
     - Consider upgrading to Tier 1 for real-time or high-volume applications
-    
+
     To configure your tier, set GEMINI_TIER=tier1 in your .env file.
     See https://ai.google.dev/pricing for tier details.
 

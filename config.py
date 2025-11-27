@@ -72,7 +72,7 @@ GEMINI_TIER = get_tier()
 
 # Rate limits на основе tier (ТОЧНЫЕ данные из официальной документации Google AI)
 # RPM - Requests Per Minute
-# TPM - Tokens Per Minute  
+# TPM - Tokens Per Minute
 # RPD - Requests Per Day
 TIER_RATE_LIMITS = {
     "free": {
@@ -150,7 +150,10 @@ def get_rate_limit(model_name: str, limit_type: str = "rpm") -> int:
         return limit_value if limit_value is not None else 0
 
     # Проверяем в audio_generation
-    if "audio_generation" in tier_config and model_name in tier_config["audio_generation"]:
+    if (
+        "audio_generation" in tier_config
+        and model_name in tier_config["audio_generation"]
+    ):
         limit_value = tier_config["audio_generation"][model_name].get(limit_type, 0)
         return limit_value if limit_value is not None else 0
 
@@ -162,7 +165,9 @@ def get_rate_limit(model_name: str, limit_type: str = "rpm") -> int:
     return 0
 
 
-def validate_model_for_tier(model_name: str, feature_type: str = "text") -> tuple[bool, str]:
+def validate_model_for_tier(
+    model_name: str, feature_type: str = "text"
+) -> tuple[bool, str]:
     """
     Проверяет доступность модели на текущем tier.
 
@@ -192,7 +197,10 @@ def validate_model_for_tier(model_name: str, feature_type: str = "text") -> tupl
                 f"Генерация аудио недоступна на tier '{GEMINI_TIER}'. "
                 f"Установите GEMINI_TIER='tier1' в env переменных MCP клиента."
             )
-        if "audio_generation" in tier_config and model_name in tier_config["audio_generation"]:
+        if (
+            "audio_generation" in tier_config
+            and model_name in tier_config["audio_generation"]
+        ):
             return True, ""
         return False, (
             f"TTS модель '{model_name}' недоступна на tier '{GEMINI_TIER}'. "
@@ -210,7 +218,10 @@ def validate_model_for_tier(model_name: str, feature_type: str = "text") -> tupl
             )
         if "image_models" in tier_config and model_name in tier_config["image_models"]:
             return True, ""
-        return False, f"Модель генерации изображений '{model_name}' недоступна на tier '{GEMINI_TIER}'."
+        return (
+            False,
+            f"Модель генерации изображений '{model_name}' недоступна на tier '{GEMINI_TIER}'.",
+        )
 
     return False, f"Неизвестный тип функции: {feature_type}"
 

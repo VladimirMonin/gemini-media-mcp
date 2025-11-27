@@ -46,7 +46,7 @@ def generate_image(
     ⚠️ TIER REQUIREMENTS:
     - **Free Tier**: Image generation is NOT AVAILABLE. You must upgrade to Tier 1.
     - **Tier 1**: Full access to all image generation models (both 'fast' and 'pro').
-    
+
     To configure your tier, set GEMINI_TIER=tier1 in your .env file.
     See https://ai.google.dev/pricing for tier details and upgrade instructions.
 
