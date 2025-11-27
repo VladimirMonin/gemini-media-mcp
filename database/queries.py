@@ -59,7 +59,8 @@ ORDER BY created_at ASC
 
 UPDATE_BATCH_STATUS = """
 UPDATE batches
-SET status = ?, google_batch_id = ?
+SET status = ?, 
+    google_batch_id = COALESCE(?, google_batch_id)
 WHERE id = ?
 """
 

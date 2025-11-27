@@ -199,14 +199,21 @@ class TestLocalQueueProcessing:
         bp.ENABLE_BATCH_API = original_enable
         bp.client = original_client
 
-        # В mock режиме batch задачи должны быть SUBMITTED через fake batch_id
+        # В mock режиме batch задачи проходят через polling:
+        # PENDING → SUBMITTED (submission) → PROCESSING/COMPLETED (polling)
         task = temp_db.get_task(task_id)
         batch = temp_db.get_batch(batch_id)
 
         # Проверить, что это был mock (fake batch_id)
-        assert batch["status"] == "SUBMITTED"
         assert batch["google_batch_id"].startswith("batches/mock_")
-        assert task["status"] == "SUBMITTED"
+        assert (
+            task["status"] == "SUBMITTED"
+        )  # Tasks не обновляются polling (только Step 3)
+
+        # Статус batch может быть SUBMITTED, PROCESSING или COMPLETED (зависит от timing)
+        assert batch["status"] in ["SUBMITTED", "PROCESSING", "COMPLETED"], (
+            f"Expected batch in submitted/processing/completed, got {batch['status']}"
+        )
 
 
 class TestGracefulShutdown:

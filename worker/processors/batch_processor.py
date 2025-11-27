@@ -159,40 +159,143 @@ def submit_pending_batches(db) -> int:
 
 def poll_active_batches(db) -> int:
     """
-    Фаза 2: Проверка статусов активных пакетов в Google Batch API.
+    Фаза 3 Шаг 2: Проверка статусов активных пакетов в Google Batch API.
 
     Алгоритм:
-    1. Получить пакеты со статусом SUBMITTED/PROCESSING
-    2. Для каждого пакета с google_batch_id:
-       - batch_status = client.batches.get(google_batch_id)
-       - Проверить batch_status.state:
-         * JOB_STATE_PENDING → ничего не делать
-         * JOB_STATE_RUNNING → обновить на PROCESSING
-         * JOB_STATE_SUCCEEDED → перейти к Retrieval
-         * JOB_STATE_FAILED → пометить все задачи как FAILED
+    1. Получить пакеты со статусом SUBMITTED/PROCESSING с google_batch_id
+    2. Для каждого пакета:
+       - Если Mock ID (batches/mock_*) → эмулировать переход к COMPLETED
+       - Если Real ID → запросить статус через client.batches.get()
+       - Преобразовать Google статус в DB статус через STATUS_MAP
+       - Обновить БД только если статус изменился
+    3. Обработать ошибки (404, rate limits) без краша
 
     Args:
         db: DatabaseManager instance
 
     Returns:
-        Количество проверенных пакетов
+        Количество обработанных пакетов (с обновлённым статусом или без)
 
-    Note:
-        ЗАГЛУШКА для Фазы 2.
-        Реальная реализация будет в Фазе 3 (Batch API Integration).
+    Status Mapping (Google → DB):
+        JOB_STATE_PENDING    → SUBMITTED (или PROCESSING если хотим видеть движение)
+        JOB_STATE_RUNNING    → PROCESSING
+        JOB_STATE_SUCCEEDED  → COMPLETED (сигнал для Шага 3)
+        JOB_STATE_FAILED     → FAILED
+        JOB_STATE_CANCELLED  → FAILED
     """
+    # 1. Получить активные пакеты (SUBMITTED или PROCESSING) с google_batch_id
     batches = db.get_pending_batches()
+    active_batches = [
+        b
+        for b in batches
+        if b.get("google_batch_id") and b["status"] in ["SUBMITTED", "PROCESSING"]
+    ]
 
-    # Фильтр: только пакеты с google_batch_id (уже отправленные)
-    submitted_batches = [b for b in batches if b.get("google_batch_id")]
+    if not active_batches:
+        return 0
 
-    if submitted_batches:
-        logger.info(
-            f"[MOCK] Would poll {len(submitted_batches)} active batches in Google Batch API"
-        )
-        # TODO Фаза 3: реальная проверка статусов через client.batches.get()
+    logger.info(f"📊 Polling {len(active_batches)} active batches")
 
-    return len(submitted_batches)
+    # 2. Маппинг статусов Google → DB
+    STATUS_MAP = {
+        "JOB_STATE_PENDING": "SUBMITTED",  # Ещё в очереди Google
+        "JOB_STATE_RUNNING": "PROCESSING",  # Google обрабатывает
+        "JOB_STATE_SUCCEEDED": "COMPLETED",  # Готов к скачиванию (Step 3)
+        "JOB_STATE_FAILED": "FAILED",  # Критическая ошибка
+        "JOB_STATE_CANCELLED": "FAILED",  # Отменён пользователем
+        "STATE_UNSPECIFIED": "SUBMITTED",  # Fallback для неизвестных статусов
+    }
+
+    processed_count = 0
+
+    for batch in active_batches:
+        batch_id = batch["id"]
+        google_batch_id = batch["google_batch_id"]
+        current_status = batch["status"]
+
+        try:
+            # 3. Определить новый статус
+            new_status = None
+
+            # КРИТИЧЕСКАЯ ПРОВЕРКА: Mock ID (из Step 1)
+            if google_batch_id.startswith("batches/mock_"):
+                # Mock режим: эмулируем быстрое завершение для тестов
+                if not ENABLE_BATCH_API:
+                    # Переход: SUBMITTED → PROCESSING → COMPLETED
+                    if current_status == "SUBMITTED":
+                        new_status = "PROCESSING"
+                    elif current_status == "PROCESSING":
+                        new_status = "COMPLETED"
+
+                    logger.debug(
+                        f"🧪 [MOCK] Batch {batch_id[:8]} emulated: {current_status} → {new_status}"
+                    )
+                else:
+                    # Если ENABLE_BATCH_API=true, но ID mock → пропустить
+                    logger.warning(
+                        f"⚠️ Batch {batch_id[:8]} has mock ID but ENABLE_BATCH_API=true. "
+                        f"Skipping (inconsistent state)"
+                    )
+                    continue
+
+            # Real API режим
+            elif ENABLE_BATCH_API and client:
+                # Запрос к Google Batch API
+                google_batch = client.batches.get(name=google_batch_id)
+
+                # Получить статус (например: "JOB_STATE_RUNNING")
+                google_state = google_batch.state
+
+                # Преобразовать в наш статус
+                new_status = STATUS_MAP.get(google_state, "SUBMITTED")
+
+                logger.debug(
+                    f"📡 Batch {batch_id[:8]}: Google state={google_state} → DB status={new_status}"
+                )
+
+            else:
+                # ENABLE_BATCH_API=false и не mock ID → пропустить
+                logger.warning(
+                    f"⚠️ Batch {batch_id[:8]} has real ID but ENABLE_BATCH_API=false. "
+                    f"Cannot poll without API access"
+                )
+                continue
+
+            # 4. Обновить БД только если статус изменился (оптимизация)
+            if new_status and new_status != current_status:
+                db.update_batch_status(batch_id, new_status)
+                logger.info(
+                    f"✅ Batch {batch_id[:8]} status updated: {current_status} → {new_status}"
+                )
+            elif new_status == current_status:
+                logger.debug(
+                    f"⏸️ Batch {batch_id[:8]} status unchanged: {current_status}"
+                )
+
+            processed_count += 1
+
+        except Exception as e:
+            # Обработка ошибок: 404, rate limits, network issues
+            logger.error(f"❌ Failed to poll batch {batch_id[:8]}: {e}")
+
+            # НЕ обновляем статус на FAILED при ошибке polling
+            # Это может быть временная проблема (сеть, rate limit)
+            # Повторим проверку в следующем цикле
+
+            # Однако если это 404 NOT_FOUND, можно пометить как FAILED
+            error_str = str(e).lower()
+            if "404" in error_str or "not found" in error_str:
+                logger.warning(
+                    f"⚠️ Batch {batch_id[:8]} not found in Google API. "
+                    f"Possible causes: expired, deleted, or invalid ID"
+                )
+                # Опционально: можно пометить как FAILED после N попыток
+                # Но для MVP оставляем в текущем статусе для retry
+
+    logger.info(
+        f"📊 Polling complete: {processed_count}/{len(active_batches)} batches processed"
+    )
+    return processed_count
 
 
 def retrieve_completed_batches(db) -> int:

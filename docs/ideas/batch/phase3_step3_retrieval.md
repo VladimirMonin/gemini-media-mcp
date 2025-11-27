@@ -151,22 +151,81 @@ result = {
 
 ### 5. Сопоставить результаты с задачами
 
+⚠️ **КРИТИЧЕСКАЯ СЕКЦИЯ: Безопасное сопоставление**
+
+**Проблема:** Inline режим **НЕ поддерживает custom_id** (только file-based режим).  
+Мы полагаемся на **порядок элементов в массиве**: результат `[0]` соответствует задаче `[0]`.
+
+**Риск:** Google Safety Filters могут **отфильтровать** некоторые промпты:
+
+- Если промпт нарушает политики → результат может быть пропущен или заменён ошибкой
+- Если Google вернёт массив **короче** отправленного → индексы разъедутся
+- Результат задачи 3 запишется в задачу 2 → **коррупция данных**
+
+**Защита (паранойя-режим):**
+
+```python
+# Получить задачи батча в ТОМ ЖЕ порядке, что отправляли
+tasks = db.get_tasks_by_batch(batch["id"])
+tasks.sort(key=lambda t: t["created_at"])  # Сохранить порядок отправки
+
+# КРИТИЧЕСКАЯ ВАЛИДАЦИЯ: длины должны совпадать
+if len(results) != len(tasks):
+    logger.error(
+        f"❌ CRITICAL: Result count mismatch! "
+        f"Tasks: {len(tasks)}, Results: {len(results)}"
+    )
+    # СТРАТЕГИЯ: Пометить весь батч как FAILED (безопасно)
+    db.update_batch_status(batch["id"], "FAILED")
+    for task in tasks:
+        db.update_task_failed(
+            task["id"], 
+            error="Batch result count mismatch (possible safety filter)"
+        )
+    continue  # Пропустить этот батч
+```
+
 **Для каждого результата:**
 
 ```python
-for result in results:
-    task_id = result["custom_id"]
+for i, result in enumerate(results):
+    # Безопасная проверка индекса
+    if i >= len(tasks):
+        logger.warning(f"Extra result at index {i}, skipping")
+        break
+    
+    task = tasks[i]
+    task_id = task["id"]
     
     if "error" in result:
         # Задача провалилась
         error_msg = result["error"]["message"]
         db.update_task_failed(task_id, error=error_msg)
     else:
-        # Задача успешна — нужно сохранить изображение
+        # Задача успешна — сохранить изображение
         image_data = extract_image_data(result)
         local_path = save_image(task_id, image_data)
         db.update_task_completed(task_id, local_path)
 ```
+
+---
+
+### 5.1. Продвинутая валидация (опционально для Production)
+
+**Если нужна 100% гарантия:**
+
+**В будущем (Фаза 4):** Миграция на **file-based режим** с поддержкой `custom_id`:
+
+- Создаёшь JSONL файл с запросами (каждый с уникальным `custom_id`)
+- Google возвращает JSONL с теми же `custom_id` → точное сопоставление
+- Недостаток: сложнее реализация (управление файлами, upload/download)
+
+**Для MVP:** Достаточно проверки `len(results) == len(tasks)` + сортировки по `created_at`.
+
+**Если инцидент произошёл:**
+
+- Логируй prompt и результат для ручной проверки
+- Отправь batch повторно с модифицированными промптами (обход фильтров)
 
 ---
 
