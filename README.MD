@@ -46,6 +46,11 @@ Model Context Protocol (MCP) server for analyzing images, audio, and video using
 - [Troubleshooting](docs/en/troubleshooting.md)
 - [Common Issues](docs/en/common-issues.md)
 
+**Development:**
+
+- [Phase 0: Batch API Validation](docs/phase0_validation.md) - Validate Google Batch API support before full async implementation
+- [Technical Specification v3.0](docs/ideas/Детальная%20техническая%20спецификация%20v3.0_%20Система%20асинхронной%20генерации%20контента%20Gemini%20Media%20MCP.md) - Async task generation system architecture
+
 ---
 
 ## Русский
