@@ -25,6 +25,14 @@ except ImportError as e:
     logger.error(f"Critical MCP import error: {e}")
     sys.exit(1)
 
+# Импорт database и worker
+try:
+    from database import DatabaseManager
+    from worker import WorkerManager
+except ImportError as e:
+    logger.error(f"Failed to import database/worker: {e}")
+    sys.exit(1)
+
 # Импорт инструментов
 try:
     from tools.image_analyzer import analyze_image
@@ -40,9 +48,32 @@ except ImportError as e:
     logger.error(f"Failed to import tools: {e}")
     sys.exit(1)
 
+# Инициализация БД и воркера
+logger.info("Initializing database...")
+db = DatabaseManager()
+db.initialize()
+logger.info("Database ready")
+
+logger.info("Starting background worker...")
+worker = WorkerManager(db, tick_interval=30)
+worker.start()
+logger.info("Worker started")
+
 # Инициализация сервера
 # dependencies=["httpx"] помогает, если fastmcp пытается сам что-то догрузить
 mcp = FastMCP("gemini-media-analyzer", dependencies=["httpx"])
+
+# Инициализация БД
+logger.info("Initializing database...")
+db = DatabaseManager()
+db.initialize()
+logger.info("Database ready")
+
+# Инициализация воркера
+logger.info("Starting background worker...")
+worker = WorkerManager(db, tick_interval=30)
+worker.start()
+logger.info("Worker started")
 
 # Регистрация инструментов
 mcp.tool()(analyze_image)
@@ -66,3 +97,10 @@ if __name__ == "__main__":
     except Exception as e:
         logger.exception(f"Critical error during server startup: {e}")
         sys.exit(1)
+    finally:
+        # Graceful shutdown
+        logger.info("Stopping worker...")
+        worker.stop(timeout=10)
+        logger.info("Closing database...")
+        db.close()
+        logger.info("Shutdown complete")

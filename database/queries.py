@@ -173,14 +173,14 @@ RECOVER_STALE_TASKS = """
 UPDATE tasks
 SET status = 'PENDING', updated_at = CURRENT_TIMESTAMP
 WHERE status = 'PROCESSING'
-  AND updated_at < datetime('now', '-' || ? || ' minutes')
+  AND datetime(updated_at) < datetime('now', 'localtime', ? || ' minutes')
 """
 
 GET_STALE_TASKS_COUNT = """
 SELECT COUNT(*)
 FROM tasks
 WHERE status = 'PROCESSING'
-  AND updated_at < datetime('now', '-' || ? || ' minutes')
+  AND datetime(updated_at) < datetime('now', 'localtime', ? || ' minutes')
 """
 
 # ============================================================================
