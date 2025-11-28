@@ -6,3 +6,4 @@
 gemini-media-mcp.md
 gemini_tasks.db
 output/
+media/tts/*.wav

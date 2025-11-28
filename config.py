@@ -646,6 +646,19 @@ IMAGE_GEN_MODELS = {
 
 DEFAULT_IMAGE_GEN_MODEL = "fast"
 
+# --- TTS (Text-to-Speech) Generation Configuration ---
+
+TTS_MODELS = {
+    "flash": "gemini-2.5-flash-preview-tts",
+    "pro": "gemini-2.5-pro-preview-tts",
+}
+
+DEFAULT_TTS_MODEL = "flash"
+
+# Путь для сохранения TTS аудио (структура media/tts/{task_id}.wav)
+OUTPUT_TTS_DIR = os.path.join(_PROJECT_ROOT, "media", "tts")
+os.makedirs(OUTPUT_TTS_DIR, exist_ok=True)
+
 # Flash поддерживает только 1:1, 16:9, 9:16, 4:3, 3:4 (базовые).
 # Pro поддерживает весь спектр.
 VALID_ASPECT_RATIOS = [

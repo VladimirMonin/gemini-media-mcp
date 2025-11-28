@@ -61,6 +61,15 @@ OPERATION_TYPES_SEED = [
         "Анализ GIF через Batch API",
         None,
     ),
+    # Local Queue операции (TTS Batch API не работает, используем синхронный API с rate limiting)
+    # rpm_limit = 10 для Tier 1 (10 RPM), 3 для Free Tier (3 RPM)
+    (
+        "TTS_GEN_QUEUE",
+        "TTS Generation (Queue)",
+        "local_queue",
+        "Генерация аудио через локальную очередь (TTS Batch API не поддерживается Google)",
+        10,  # 10 RPM на Tier 1, динамически читается из БД
+    ),
 ]
 
 # SQL для вставки (используется в manager.py)

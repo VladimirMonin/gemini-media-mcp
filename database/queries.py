@@ -130,6 +130,17 @@ WHERE status = 'PROCESSING'
 ORDER BY updated_at ASC
 """
 
+GET_PENDING_LOCAL_QUEUE_TASKS = """
+SELECT t.id, t.batch_id, t.operation_type, t.status, t.input_payload, t.search_keywords,
+       t.target_path, t.local_path, t.error_details, t.created_at, t.updated_at, t.completed_at
+FROM tasks t
+JOIN operation_types ot ON t.operation_type = ot.operation_type
+WHERE t.status = 'PENDING'
+  AND ot.execution_mode = 'local_queue'
+ORDER BY t.created_at ASC
+LIMIT ?
+"""
+
 # ============================================================================
 # Tasks (UPDATE)
 # ============================================================================

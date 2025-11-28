@@ -168,6 +168,20 @@ class DatabaseManager:
         """Задачи в статусе PROCESSING (для recovery после сбоя)."""
         return self._tasks.get_processing()
 
+    def get_pending_local_queue_tasks(self, limit: int = 1) -> list[dict]:
+        """
+        Задачи в статусе PENDING с execution_mode='local_queue'.
+
+        Используется для TTS и других операций, не поддерживающих Batch API.
+
+        Args:
+            limit: Максимум задач за раз (дефолт=1 для rate limiting)
+
+        Returns:
+            Список задач с десериализованными input_payload
+        """
+        return self._tasks.get_pending_local_queue(limit)
+
     def update_task_status(
         self, task_id: str, status: str, error_details: Optional[str] = None
     ) -> None:

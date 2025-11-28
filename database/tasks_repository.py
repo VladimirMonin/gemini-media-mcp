@@ -162,6 +162,29 @@ class TasksRepository:
 
         return tasks
 
+    def get_pending_local_queue(self, limit: int = 1) -> list[dict]:
+        """
+        Задачи в статусе PENDING с execution_mode='local_queue'.
+
+        Используется для TTS и других операций, не поддерживающих Batch API.
+
+        Args:
+            limit: Максимум задач за раз (дефолт=1 для rate limiting)
+
+        Returns:
+            Список задач с полями из БД (+ десериализованный input_payload)
+        """
+        cursor = self.conn_mgr.execute(queries.GET_PENDING_LOCAL_QUEUE_TASKS, (limit,))
+        rows = cursor.fetchall()
+
+        tasks = []
+        for row in rows:
+            task = dict(row)
+            task["input_payload"] = json.loads(task["input_payload"])
+            tasks.append(task)
+
+        return tasks
+
     # ========================================================================
     # UPDATE
     # ========================================================================

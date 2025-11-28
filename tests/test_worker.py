@@ -13,6 +13,7 @@ import time
 import logging
 from uuid import uuid4
 from datetime import datetime, timedelta
+from unittest.mock import patch, MagicMock
 
 from database import DatabaseManager
 from worker import WorkerManager
@@ -121,44 +122,67 @@ class TestHealthCheck:
 class TestLocalQueueProcessing:
     """Тесты обработки local_queue задач."""
 
-    def test_local_queue_processes_one_task(self, temp_db):
-        """Воркер обрабатывает 1 TTS задачу за цикл."""
+    @patch("worker.processors.queue_processor.genai")
+    def test_local_queue_processes_one_task(
+        self, mock_genai, temp_db, tmp_path, monkeypatch
+    ):
+        """Воркер обрабатывает 1 TTS задачу за цикл (с моком API).
+
+        Note: Тест медленный (~15 сек) из-за rate limiting sleep.
+        """
+        import config
+
+        # Подменить OUTPUT_TTS_DIR на tmp_path
+        monkeypatch.setattr(config, "OUTPUT_TTS_DIR", str(tmp_path / "media" / "tts"))
+
+        # Настроить мок Gemini API
+        mock_response = MagicMock()
+        mock_response.candidates = [MagicMock()]
+        mock_response.candidates[0].content.parts = [MagicMock()]
+        mock_response.candidates[0].content.parts[0].inline_data = MagicMock()
+        # Base64 minimal WAV
+        mock_response.candidates[0].content.parts[
+            0
+        ].inline_data.data = (
+            "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
+        )
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        mock_genai.Client.return_value = mock_client
+
         batch_id = str(uuid4())
         task_id = str(uuid4())
 
-        # Добавить временный operation_type с local_queue режимом для теста
-        temp_db._conn.execute("""
-            INSERT OR IGNORE INTO operation_types (operation_type, display_name, execution_mode, description)
-            VALUES ('TTS_QUEUE', 'TTS Local Queue', 'local_queue', 'Test operation for local queue')
-        """)
-        temp_db._conn.commit()
-
+        # TTS_GEN_QUEUE уже есть в seed_data с execution_mode='local_queue'
         temp_db.create_batch_with_tasks(
             batch_id=batch_id,
-            operation_type="TTS_QUEUE",  # Используем тестовый operation_type
+            operation_type="TTS_GEN_QUEUE",
             tasks=[
                 {
                     "task_id": task_id,
-                    "input_payload": {"script": "test audio"},
-                    "target_path": "output/test.wav",
+                    "input_payload": {"text": "Hello test audio"},
+                    "target_path": str(tmp_path / "test.wav"),
                     "search_keywords": "test",
                 }
             ],
         )
 
-        # Запустить воркер
+        # Запустить воркер с коротким интервалом
         worker = WorkerManager(temp_db, tick_interval=2)
         worker.start()
 
-        # Даём время на обработку (1 цикл + mock sleep 2s)
-        time.sleep(5)
+        # Даём время на несколько циклов воркера
+        # tick_interval=2 + rate_limit=6s (60/10) + some buffer
+        time.sleep(15)
 
         worker.stop(timeout=5)
 
         # Проверить, что задача завершена
         task = temp_db.get_task(task_id)
-        assert task["status"] == "COMPLETED"
-        assert task["local_path"] == "output/test.wav"
+        assert task["status"] == "COMPLETED", (
+            f"Expected COMPLETED, got {task['status']}"
+        )
+        assert task["local_path"] is not None
 
     def test_local_queue_ignores_batch_tasks(self, temp_db):
         """Воркер не обрабатывает batch задачи в local_queue процессоре."""

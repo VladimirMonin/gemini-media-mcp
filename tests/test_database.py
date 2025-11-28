@@ -65,7 +65,7 @@ class TestInitialization:
     def test_seed_data_loaded(self, temp_db):
         """Test that seed data is loaded into operation_types."""
         op_types = temp_db.get_all_operation_types()
-        assert len(op_types) == 10  # 6 sync + 4 batch
+        assert len(op_types) == 11  # 6 sync + 4 batch + 1 local_queue (TTS_GEN_QUEUE)
 
         # Check specific operation exists
         img_gen = temp_db.get_operation_type("IMG_GEN")
