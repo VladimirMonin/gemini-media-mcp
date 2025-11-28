@@ -8,10 +8,14 @@ Batch Processor — обработка задач через Google Batch API.
 - GIF_ANALYZE_BATCH
 """
 
+import base64
+import json
 import logging
 import os
+from pathlib import Path
 
 import google.genai as genai
+import httpx
 
 from config import GEMINI_API_KEY, get_batch_model
 
@@ -107,6 +111,11 @@ def submit_pending_batches(db) -> int:
                 submitted_count += 1
             else:
                 # РЕАЛЬНЫЙ режим: отправка в Google Batch API
+
+                # ⚠️ КРИТИЧНО: Детерминированная сортировка по (created_at, id)
+                # Inline режим НЕ поддерживает custom_id, полагаемся на порядок массива
+                # При retrieval результатов используем ТОТ ЖЕ порядок для сопоставления
+                tasks.sort(key=lambda t: (t["created_at"], t["id"]))
 
                 # Формируем inline_requests из input_payload каждой задачи
                 # Note: inline режим НЕ поддерживает custom_id (только для file-based метода)
@@ -300,30 +309,291 @@ def poll_active_batches(db) -> int:
 
 def retrieve_completed_batches(db) -> int:
     """
-    Фаза 3: Скачивание готовых результатов из Google Batch API.
+    Фаза 3 Шаг 3: Скачивание и обработка результатов COMPLETED пакетов.
 
     Алгоритм:
-    1. Найти пакеты со статусом PROCESSING, у которых JOB_STATE_SUCCEEDED
-    2. Для каждого batch:
-       - results = batch_status.results
-       - Для каждого result:
-         * Найти задачу по custom_id (это task_id)
-         * Извлечь bytes изображения
-         * Сохранить в target_path
-         * db.update_task_completed()
-    3. Проверить прогресс пакета:
-       - Если все задачи завершены → db.update_batch_completed()
+    1. Найти COMPLETED батчи с google_batch_id
+    2. Для каждого:
+       - Скачать JSONL из output_file_uri
+       - КРИТИЧЕСКАЯ ВАЛИДАЦИЯ: len(results) == len(tasks)
+       - Сопоставить по индексам (inline режим без custom_id)
+       - Сохранить файлы с шардингом media/generated/{batch_id}/{task_id}.png
+       - Обновить статусы задач (COMPLETED/FAILED)
+       - Закрыть батч
 
     Args:
         db: DatabaseManager instance
 
     Returns:
-        Количество скачанных результатов
+        Количество обработанных батчей
 
-    Note:
-        ЗАГЛУШКА для Фазы 2.
-        Реальная реализация будет в Фазе 3 (Batch API Integration).
+    Security Notes:
+        - Паранойя-режим: если len(results) != len(tasks) → весь батч FAILED
+        - Детерминированная сортировка tasks по (created_at, id)
+        - Атомарность: файл на диск → потом БД
     """
-    logger.debug("[MOCK] No completed batches to retrieve yet")
-    # TODO Фаза 3: реальное скачивание результатов
-    return 0
+    # 1. Найти COMPLETED батчи с google_batch_id
+    # ВАЖНО: get_pending_batches() не включает COMPLETED статусы
+    # Нужно явно запросить батчи со статусом COMPLETED
+    all_batches = db.get_pending_batches()
+
+    # Добавить COMPLETED батчи (которые могут быть готовы к retrieval)
+    try:
+        completed_status_batches = db._batches.get_by_status("COMPLETED")
+        all_batches.extend(completed_status_batches)
+    except Exception as e:
+        logger.warning(f"Failed to query COMPLETED batches: {e}")
+
+    completed_batches = [
+        b
+        for b in all_batches
+        if b["status"] == "COMPLETED" and b.get("google_batch_id")
+    ]
+
+    if not completed_batches:
+        return 0
+
+    logger.info(
+        f"📥 Retrieving results from {len(completed_batches)} completed batches"
+    )
+
+    processed_count = 0
+
+    for batch in completed_batches:
+        batch_id = batch["id"]
+        google_batch_id = batch["google_batch_id"]
+
+        try:
+            # 2. Mock режим: эмулировать успешные результаты
+            if google_batch_id.startswith("batches/mock_"):
+                if not ENABLE_BATCH_API:
+                    # Получить задачи батча в детерминированном порядке
+                    tasks = db.get_tasks_by_batch(batch_id)
+                    tasks.sort(key=lambda t: (t["created_at"], t["id"]))
+
+                    logger.info(
+                        f"🧪 [MOCK] Processing batch {batch_id[:8]} with {len(tasks)} tasks"
+                    )
+
+                    # Эмулировать успешные результаты для всех задач
+                    for task in tasks:
+                        # Mock: создать фейковое изображение (1x1 прозрачный PNG)
+                        mock_png_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+                        # Сохранить с шардингом
+                        local_path = _save_image(
+                            batch_id,
+                            task["id"],
+                            mock_png_base64,
+                            task.get("target_path"),
+                        )
+
+                        # Обновить БД
+                        db.update_task_completed(task["id"], local_path=local_path)
+                        logger.debug(
+                            f"✅ [MOCK] Task {task['id'][:8]} completed: {local_path}"
+                        )
+
+                    # Закрыть батч
+                    db.update_batch_completed(batch_id)
+                    logger.info(f"✅ [MOCK] Batch {batch_id[:8]} completed")
+                    processed_count += 1
+                    continue
+                else:
+                    # Режим для тестов: mock ID но ENABLE_BATCH_API=true
+                    # Используем Real API path с mock client (патченный в тестах)
+                    pass  # Продолжаем вниз к Real API режиму
+
+            # 3. Real API режим
+            if not ENABLE_BATCH_API or not client:
+                logger.warning(
+                    f"⚠️ Batch {batch_id[:8]} has real ID but ENABLE_BATCH_API=false"
+                )
+                continue
+
+            # Получить объект батча из Google
+            google_batch = client.batches.get(name=google_batch_id)
+
+            # Проверить наличие output_file_uri
+            if not google_batch.output_file_uri:
+                logger.warning(
+                    f"⚠️ Batch {batch_id[:8]} has no output_file_uri yet. State: {google_batch.state}"
+                )
+                continue
+
+            # Скачать JSONL файл
+            logger.debug(
+                f"📥 Downloading JSONL from: {google_batch.output_file_uri[:50]}..."
+            )
+            response = httpx.get(google_batch.output_file_uri)
+            response.raise_for_status()
+
+            # Парсить построчно
+            try:
+                results = []
+                for line in response.text.strip().split("\n"):
+                    if line.strip():
+                        results.append(json.loads(line))
+            except json.JSONDecodeError as e:
+                logger.error(
+                    f"❌ Invalid JSON in batch {batch_id[:8]} results: {e}. "
+                    f"Marking batch and all tasks as FAILED."
+                )
+                db.update_batch_status(batch_id, "FAILED")
+
+                # Пометить все задачи как FAILED
+                tasks = db.get_tasks_by_batch(batch_id)
+                for task in tasks:
+                    db.update_task_failed(
+                        task["id"], error=f"Invalid JSON in batch results: {e}"
+                    )
+
+                continue  # Пропустить этот батч
+
+            # 4. Получить задачи в ТОМ ЖЕ порядке что отправляли (детерминированная сортировка)
+            tasks = db.get_tasks_by_batch(batch_id)
+            tasks.sort(key=lambda t: (t["created_at"], t["id"]))
+
+            # 🚨 КРИТИЧЕСКАЯ ВАЛИДАЦИЯ: Паранойя-режим
+            if len(results) != len(tasks):
+                logger.error(
+                    f"❌ CRITICAL: Batch {batch_id[:8]} result count mismatch! "
+                    f"Tasks: {len(tasks)}, Results: {len(results)}. "
+                    f"Possible Safety Filter corruption. Marking entire batch as FAILED."
+                )
+
+                # Пометить весь батч как FAILED
+                db.update_batch_status(batch_id, "FAILED")
+
+                # Пометить все задачи как FAILED с объяснением
+                for task in tasks:
+                    db.update_task_failed(
+                        task["id"],
+                        error="Result count mismatch (possible safety filter). Entire batch marked as FAILED for data integrity.",
+                    )
+
+                continue  # Пропустить этот батч, не инкрементировать processed_count
+
+            # 5. Обработать каждый результат (сопоставление по индексу)
+            logger.info(
+                f"📦 Processing {len(results)} results for batch {batch_id[:8]}"
+            )
+
+            for i, result in enumerate(results):
+                task = tasks[
+                    i
+                ]  # Безопасно: валидация len() выше гарантирует совпадение
+                task_id = task["id"]
+
+                # Проверка на ошибку в результате
+                if "error" in result:
+                    error_msg = result["error"].get("message", "Unknown error")
+                    logger.warning(f"❌ Task {task_id[:8]} failed: {error_msg}")
+                    db.update_task_failed(task_id, error=error_msg)
+                else:
+                    # Успех: извлечь и сохранить изображение
+                    try:
+                        base64_data = _extract_image_data(result)
+                        local_path = _save_image(
+                            batch_id, task_id, base64_data, task.get("target_path")
+                        )
+                        db.update_task_completed(task_id, local_path=local_path)
+                        logger.debug(f"✅ Task {task_id[:8]} completed: {local_path}")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to save task {task_id[:8]}: {e}")
+                        db.update_task_failed(task_id, error=f"Save error: {e}")
+
+            # 6. Закрыть батч
+            db.update_batch_completed(batch_id)
+            logger.info(
+                f"✅ Batch {batch_id[:8]} completed: {len(results)} tasks processed"
+            )
+            processed_count += 1
+
+        except Exception as e:
+            logger.error(f"❌ Failed to retrieve batch {batch_id[:8]}: {e}")
+            # НЕ помечаем как FAILED при ошибке скачивания (может быть transient)
+            # Повторим в следующем цикле
+
+    logger.info(
+        f"📥 Retrieval complete: {processed_count}/{len(completed_batches)} batches processed"
+    )
+    return processed_count
+
+
+def _extract_image_data(result: dict) -> str:
+    """
+    Извлечь base64 данные изображения из результата Google Batch API.
+
+    Args:
+        result: Распарсенная строка JSONL
+
+    Returns:
+        Base64 строка (без префикса data:image/png;base64,)
+
+    Raises:
+        KeyError: Если структура ответа не соответствует ожидаемой
+        ValueError: Если нет inline_data в результате
+    """
+    candidate = result["response"]["candidates"][0]
+    part = candidate["content"]["parts"][0]
+
+    if "inline_data" not in part:
+        raise ValueError("No inline_data in response (expected image data)")
+
+    return part["inline_data"]["data"]
+
+
+def _save_image(
+    batch_id: str, task_id: str, base64_data: str, target_path: str = None
+) -> str:
+    """
+    Сохранить изображение из base64 с файловым шардингом.
+
+    Стратегия сохранения:
+    1. Приоритет: target_path из задачи (если указан и доступен)
+    2. Fallback: media/generated/{batch_id}/{task_id}.png (шардинг по батчам)
+
+    Args:
+        batch_id: UUID батча (для шардинга)
+        task_id: UUID задачи (для имени файла)
+        base64_data: Base64 строка изображения
+        target_path: Путь из задачи (опционально)
+
+    Returns:
+        Абсолютный путь к сохранённому файлу
+
+    Raises:
+        IOError: Если не удалось сохранить даже в fallback директорию
+    Raises:
+        IOError: Если не удалось сохранить даже в fallback директорию
+    """
+    # Декодировать base64
+    image_bytes = base64.b64decode(base64_data)
+    if target_path:
+        try:
+            local_path = Path(target_path)
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(local_path, "wb") as f:
+                f.write(image_bytes)
+
+            logger.debug(f"💾 Saved to target_path: {local_path}")
+            return str(local_path.absolute())
+        except (IOError, OSError) as e:
+            logger.warning(
+                f"⚠️ Failed to save to target_path {target_path}: {e}. Using fallback."
+            )
+
+    # Попытка 2: Fallback — шардинг по batch_id
+    # media/generated/{batch_id}/{task_id}.png
+    output_dir = Path("media") / "generated" / batch_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    local_path = output_dir / f"{task_id}.png"
+
+    with open(local_path, "wb") as f:
+        f.write(image_bytes)
+
+    logger.debug(f"💾 Saved to fallback (sharded): {local_path}")
+    return str(local_path.absolute())
