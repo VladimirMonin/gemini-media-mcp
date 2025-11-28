@@ -43,7 +43,7 @@ class TasksRepository:
         batch_id: str,
         operation_type: str,
         input_payload: dict,
-        target_path: str,
+        target_path: Optional[str] = None,
         search_keywords: Optional[str] = None,
     ) -> None:
         """
@@ -54,7 +54,7 @@ class TasksRepository:
             batch_id: Родительский пакет
             operation_type: Тип операции
             input_payload: Параметры для retry (сериализуется в JSON)
-            target_path: Куда сохранить результат
+            target_path: Куда сохранить результат (опционально, воркер сам решит)
             search_keywords: Ключевые слова для поиска (опционально)
         """
         payload_json = json.dumps(input_payload)

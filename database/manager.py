@@ -139,7 +139,7 @@ class DatabaseManager:
         batch_id: str,
         operation_type: str,
         input_payload: dict,
-        target_path: str,
+        target_path: Optional[str] = None,
         search_keywords: Optional[str] = None,
     ) -> None:
         """Создать задачу."""

@@ -44,20 +44,15 @@ try:
     )
     from tools.gif_analyzer import analyze_gif, get_gif_guidelines
     from tools.video_analyzer import analyze_video
+    from tools.batch_tools import (
+        batch_generate_images,
+        queue_generate_audio,
+        check_task_status,
+        check_batch_progress,
+    )
 except ImportError as e:
     logger.error(f"Failed to import tools: {e}")
     sys.exit(1)
-
-# Инициализация БД и воркера
-logger.info("Initializing database...")
-db = DatabaseManager()
-db.initialize()
-logger.info("Database ready")
-
-logger.info("Starting background worker...")
-worker = WorkerManager(db, tick_interval=30)
-worker.start()
-logger.info("Worker started")
 
 # Инициализация сервера
 # dependencies=["httpx"] помогает, если fastmcp пытается сам что-то догрузить
@@ -75,7 +70,7 @@ worker = WorkerManager(db, tick_interval=30)
 worker.start()
 logger.info("Worker started")
 
-# Регистрация инструментов
+# Регистрация синхронных инструментов (анализ/генерация)
 mcp.tool()(analyze_image)
 logger.info(f"Tool '{analyze_image.__name__}' registered.")
 
@@ -86,6 +81,15 @@ mcp.tool()(get_audio_generation_guide)
 mcp.tool()(analyze_gif)
 mcp.tool()(get_gif_guidelines)
 mcp.tool()(analyze_video)
+
+# Регистрация batch/queue инструментов (Phase 3)
+mcp.tool()(batch_generate_images)
+mcp.tool()(queue_generate_audio)
+mcp.tool()(check_task_status)
+mcp.tool()(check_batch_progress)
+logger.info(
+    "Batch tools registered: batch_generate_images, queue_generate_audio, check_task_status, check_batch_progress"
+)
 
 if __name__ == "__main__":
     try:

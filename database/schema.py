@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     status TEXT DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'SUBMITTED', 'PROCESSING', 'COMPLETED', 'FAILED', 'DELIVERY_FAILED')),
     input_payload TEXT NOT NULL,
     search_keywords TEXT,
-    target_path TEXT NOT NULL,
+    target_path TEXT,
     local_path TEXT,
     error_details TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
