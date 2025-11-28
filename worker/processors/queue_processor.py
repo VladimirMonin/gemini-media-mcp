@@ -10,9 +10,9 @@ Queue Processor — обработка задач в режиме local_queue (�
 - Файлы сохраняются в media/tts/{task_id}.wav (единообразие с media/generated/)
 """
 
-import base64
 import logging
 import time
+import wave
 from pathlib import Path
 from typing import Optional
 
@@ -68,39 +68,45 @@ def _get_rate_limit_delay(db, operation_type: str) -> float:
 
 
 def _save_tts_audio(
-    task_id: str, audio_base64: str, target_path: Optional[str] = None
+    task_id: str, pcm_data: bytes, target_path: Optional[str] = None
 ) -> str:
     """
-    Сохранить TTS аудио из base64 в файл.
+    Сохранить TTS аудио в WAV файл.
+
+    Gemini TTS API возвращает RAW PCM данные (не готовый WAV!).
+    Параметры PCM: 24000 Hz, 16-bit, mono (из документации Google).
 
     Args:
         task_id: UUID задачи
-        audio_base64: Base64-encoded WAV данные
+        pcm_data: RAW PCM bytes от Gemini TTS API (inline_data.data)
         target_path: Явный путь из задачи (если указан пользователем)
 
     Returns:
-        Абсолютный путь к сохранённому файлу
+        Абсолютный путь к сохранённому WAV файлу
 
     Note:
         Если target_path не указан, используется media/tts/{task_id}.wav
     """
-    audio_bytes = base64.b64decode(audio_base64)
-
     if target_path:
-        # Пользователь указал свой путь
         local_path = Path(target_path)
     else:
-        # Стандартный путь: media/tts/{task_id}.wav
         local_path = Path(config.OUTPUT_TTS_DIR) / f"{task_id}.wav"
 
     # Создать директории
     local_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Записать файл
-    with open(local_path, "wb") as f:
-        f.write(audio_bytes)
+    # Записать WAV файл с правильным заголовком
+    # Параметры из документации Google TTS:
+    # - channels: 1 (mono)
+    # - sample_width: 2 (16-bit)
+    # - framerate: 24000 Hz
+    with wave.open(str(local_path), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(24000)
+        wf.writeframes(pcm_data)
 
-    logger.debug(f"TTS audio saved: {local_path} ({len(audio_bytes)} bytes)")
+    logger.debug(f"TTS audio saved: {local_path} ({len(pcm_data)} bytes PCM)")
 
     return str(local_path.absolute())
 
@@ -110,9 +116,9 @@ def _save_tts_audio(
 # ============================================================================
 
 
-def _generate_tts(text: str, voice: str, model_type: str) -> str:
+def _generate_tts(text: str, voice: str, model_type: str) -> bytes:
     """
-    Вызвать Gemini TTS API и вернуть base64 аудио.
+    Вызвать Gemini TTS API и вернуть аудио данные.
 
     Args:
         text: Текст для синтеза
@@ -120,7 +126,7 @@ def _generate_tts(text: str, voice: str, model_type: str) -> str:
         model_type: 'flash' или 'pro'
 
     Returns:
-        Base64-encoded WAV данные
+        Raw audio bytes от Gemini TTS API
 
     Raises:
         ValueError: Если API не вернул аудио данные

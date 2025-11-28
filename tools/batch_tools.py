@@ -256,30 +256,39 @@ def queue_generate_audio(
             f"Valid options: {list(TTS_MODELS.keys())}"
         )
 
-    # --- 2. Create task_id ---
+    # --- 2. Create IDs ---
     task_id = str(uuid4())
-    logger.info(f"Creating TTS task {task_id}")
+    batch_id = str(uuid4())  # TTS нужна batch-обёртка (FK constraint)
+    logger.info(f"Creating TTS task {task_id} in batch {batch_id}")
 
     # --- 3. Get model name from config ---
     model_name = TTS_MODELS[model_type]
 
     # --- 4. Write to DB ---
-    # NOTE: target_path is None - worker will determine path
-    # Worker uses: media/tts/{task_id}.wav
-    db.create_task(
-        task_id=task_id,
+    # TTS задачи создаются как batch с одной задачей
+    # (схема требует batch_id из-за FK constraint)
+    # Worker использует: media/tts/{task_id}.wav
+    tasks = [
+        {
+            "task_id": task_id,
+            "input_payload": json.dumps(
+                {
+                    "text": text,
+                    "voice": voice_lower,
+                    "model": model_name,
+                    "model_type": model_type,
+                }
+            ),
+            "target_path": None,  # Worker decides the path
+        }
+    ]
+
+    db.create_batch_with_tasks(
+        batch_id=batch_id,
         operation_type="TTS_GEN_QUEUE",
-        input_payload=json.dumps(
-            {
-                "text": text,
-                "voice": voice_lower,
-                "model": model_name,
-                "model_type": model_type,
-            }
-        ),
-        target_path=None,  # Worker decides the path
+        tasks=tasks,
     )
-    logger.info(f"TTS task {task_id} saved to DB")
+    logger.info(f"TTS task {task_id} saved to DB (batch wrapper: {batch_id})")
 
     # --- 5. Calculate estimated cost ---
     estimated_cost = 0.01  # ~$0.01 per TTS request

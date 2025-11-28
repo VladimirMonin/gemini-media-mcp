@@ -81,6 +81,19 @@ class DatabaseManager:
         """Закрыть соединение с БД (при graceful shutdown)."""
         self._conn.close()
 
+    def execute_pragma(self, pragma: str) -> None:
+        """
+        Выполнить PRAGMA команду (для WAL режима и др.).
+
+        Args:
+            pragma: PRAGMA команда без точки с запятой
+                    Пример: "journal_mode=WAL"
+
+        Raises:
+            RuntimeError: Если БД не инициализирована
+        """
+        self._conn.execute(f"PRAGMA {pragma}")
+
     # ========================================================================
     # Operation Types (делегирование в OperationTypesRepository)
     # ========================================================================

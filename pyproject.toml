@@ -39,6 +39,17 @@ Issues = "https://github.com/your-username/gemini-image-mcp/issues"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+markers = [
+    "paid: marks tests as requiring real API calls and money (deselect with '-m \"not paid\"')",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
 [project.scripts]
 gemini-image-mcp = "server:main"
 install-gemini-mcp = "scripts.install_server:main"

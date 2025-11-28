@@ -12,10 +12,11 @@ import base64
 import json
 import logging
 import os
+import tempfile
 from pathlib import Path
 
 import google.genai as genai
-import httpx
+from google.genai import types
 
 from config import GEMINI_API_KEY, get_batch_model
 
@@ -68,15 +69,15 @@ def submit_pending_batches(db) -> int:
     # Фильтр: только batch-режим
     batch_mode_batches = []
     for batch in pending_batches:
-        # Получить первую задачу пакета, чтобы узнать operation_type
-        tasks_in_batch = [
-            t
-            for t in db.get_pending_tasks(limit=1000)
-            if t.get("batch_id") == batch["id"]
-        ]
+        # Получить ВСЕ задачи пакета через get_tasks_by_batch (не get_pending_tasks!)
+        # get_pending_tasks фильтрует по статусу, а нам нужны все задачи batch-а
+        all_batch_tasks = db.get_tasks_by_batch(batch["id"])
+
+        # Фильтруем только PENDING задачи для отправки
+        tasks_in_batch = [t for t in all_batch_tasks if t.get("status") == "PENDING"]
 
         if not tasks_in_batch:
-            logger.warning(f"Batch {batch['id']} has no tasks, skipping")
+            logger.warning(f"Batch {batch['id']} has no PENDING tasks, skipping")
             continue
 
         # Проверить execution_mode через operation_type первой задачи
@@ -110,52 +111,104 @@ def submit_pending_batches(db) -> int:
 
                 submitted_count += 1
             else:
-                # РЕАЛЬНЫЙ режим: отправка в Google Batch API
+                # РЕАЛЬНЫЙ режим: отправка в Google Batch API через FILE-BASED метод
+                # Для генерации изображений inline режим НЕ сохраняет результаты,
+                # поэтому используем JSONL файл
 
                 # ⚠️ КРИТИЧНО: Детерминированная сортировка по (created_at, id)
-                # Inline режим НЕ поддерживает custom_id, полагаемся на порядок массива
-                # При retrieval результатов используем ТОТ ЖЕ порядок для сопоставления
                 tasks.sort(key=lambda t: (t["created_at"], t["id"]))
 
-                # Формируем inline_requests из input_payload каждой задачи
-                # Note: inline режим НЕ поддерживает custom_id (только для file-based метода)
-                # Порядок результатов гарантирован для <20MB батчей (документация Google)
-                # TODO Phase 3 Step 3: Переход на file-based режим при необходимости (>20MB)
-                inline_requests = []
+                # Формируем JSONL файл с запросами
+                # Каждая строка: {"key": "task_id", "request": {...}}
+                jsonl_lines = []
                 for task in tasks:
                     input_payload = task.get("input_payload", {})
+
+                    # input_payload может быть JSON строкой или уже dict
+                    if isinstance(input_payload, str):
+                        input_payload = json.loads(input_payload)
 
                     # Для IMG_GEN_BATCH: input_payload = {"prompt": "..."}
                     prompt = input_payload.get("prompt", "")
 
-                    request = {
-                        "contents": [{"parts": [{"text": prompt}], "role": "user"}]
+                    # File-based формат с custom key для сопоставления
+                    request_obj = {
+                        "key": task["id"],  # Используем task_id как ключ
+                        "request": {
+                            "contents": [{"parts": [{"text": prompt}], "role": "user"}],
+                            "generation_config": {
+                                "responseModalities": ["TEXT", "IMAGE"]
+                            },
+                        },
                     }
-                    inline_requests.append(request)
+                    jsonl_lines.append(json.dumps(request_obj))
 
-                # Динамически выбираем модель по operation_type
-                operation_type = tasks[0]["operation_type"]
-                # Передаём input_payload первой задачи для извлечения model_type (fast/pro)
-                first_payload = tasks[0].get("input_payload", {})
-                model = get_batch_model(operation_type, first_payload)
+                # Записать JSONL во временный файл и загрузить в File API
+                jsonl_content = "\n".join(jsonl_lines)
 
-                logger.info(f"Selected model: {model} (operation: {operation_type})")
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+                ) as f:
+                    f.write(jsonl_content)
+                    temp_file_path = f.name
 
-                # Вызываем Batch API
-                # TODO Phase 4: Exponential backoff для transient ошибок (429, 503)
-                result = client.batches.create(model=model, src=inline_requests)
+                try:
+                    # Загрузить файл в Google File API
+                    uploaded_file = client.files.upload(
+                        file=temp_file_path,
+                        config=types.UploadFileConfig(
+                            display_name=f"batch-{batch_id[:8]}",
+                            mime_type="application/jsonl",
+                        ),
+                    )
+                    logger.info(f"📤 Uploaded JSONL: {uploaded_file.name}")
 
-                google_batch_id = result.name  # "batches/abc123xyz..."
-                logger.info(f"✅ Batch submitted: {google_batch_id}")
+                    # Динамически выбираем модель по operation_type
+                    operation_type = tasks[0]["operation_type"]
+                    first_payload = tasks[0].get("input_payload", {})
+                    if isinstance(first_payload, str):
+                        first_payload = json.loads(first_payload)
+                    model = get_batch_model(operation_type, first_payload)
 
-                # Обновить статус пакета
-                db.update_batch_status(batch_id, "SUBMITTED", google_batch_id)
+                    logger.info(
+                        f"Selected model: {model} (operation: {operation_type})"
+                    )
 
-                # Обновить статусы всех задач в пакете
-                for task in tasks:
-                    db.update_task_status(task["id"], "SUBMITTED")
+                    # Вызываем Batch API с file-based source
+                    result = client.batches.create(
+                        model=model,
+                        src=uploaded_file.name,
+                        config={"display_name": f"batch-{batch_id[:8]}"},
+                    )
 
-                submitted_count += 1
+                    google_batch_id = result.name  # "batches/abc123xyz..."
+                    logger.info(f"Batch submitted: {google_batch_id}")
+
+                    # Удалить входной JSONL файл из Google Cloud
+                    # (файлы хранятся 48ч и занимают квоту 20GB на проект)
+                    try:
+                        client.files.delete(name=uploaded_file.name)
+                        logger.debug(f"Deleted input file: {uploaded_file.name}")
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to delete input file {uploaded_file.name}: {e}"
+                        )
+
+                    # Обновить статус пакета
+                    db.update_batch_status(batch_id, "SUBMITTED", google_batch_id)
+
+                    # Обновить статусы всех задач в пакете
+                    for task in tasks:
+                        db.update_task_status(task["id"], "SUBMITTED")
+
+                    submitted_count += 1
+
+                finally:
+                    # Удалить временный файл
+                    try:
+                        os.unlink(temp_file_path)
+                    except Exception:
+                        pass
 
         except Exception as e:
             logger.error(f"❌ Failed to submit batch {batch_id}: {e}")
@@ -404,144 +457,174 @@ def retrieve_completed_batches(db) -> int:
                     # Используем Real API path с mock client (патченный в тестах)
                     pass  # Продолжаем вниз к Real API режиму
 
-            # 3. Real API режим
+            # 3. Real API режим (file-based)
             if not ENABLE_BATCH_API or not client:
                 logger.warning(
-                    f"⚠️ Batch {batch_id[:8]} has real ID but ENABLE_BATCH_API=false"
+                    f"Batch {batch_id[:8]} has real ID but ENABLE_BATCH_API=false"
                 )
                 continue
 
             # Получить объект батча из Google
             google_batch = client.batches.get(name=google_batch_id)
 
-            # Проверить наличие output_file_uri
-            if not google_batch.output_file_uri:
+            # Проверить статус батча (state может быть enum или string)
+            batch_state = google_batch.state
+            batch_state_str = str(batch_state)
+            if "SUCCEEDED" not in batch_state_str:
                 logger.warning(
-                    f"⚠️ Batch {batch_id[:8]} has no output_file_uri yet. State: {google_batch.state}"
+                    f"Batch {batch_id[:8]} not ready yet. State: {batch_state}"
                 )
                 continue
 
-            # Скачать JSONL файл
-            logger.debug(
-                f"📥 Downloading JSONL from: {google_batch.output_file_uri[:50]}..."
-            )
-            response = httpx.get(google_batch.output_file_uri)
-            response.raise_for_status()
+            # File-based режим: результаты в dest.file_name (JSONL файл)
+            dest = getattr(google_batch, "dest", None)
+            if dest is None:
+                logger.error(
+                    f"Batch {batch_id[:8]} has no dest attribute. Cannot retrieve results."
+                )
+                continue
 
-            # Парсить построчно
+            output_file = getattr(dest, "file_name", None)
+            if not output_file:
+                # Попробуем inlined_responses как fallback
+                inlined = getattr(dest, "inlined_responses", None)
+                if inlined:
+                    logger.warning(
+                        f"Batch {batch_id[:8]} has inlined_responses but we expected file_name. "
+                        f"This shouldn't happen with file-based submission."
+                    )
+                logger.error(
+                    f"Batch {batch_id[:8]} has no file_name in dest. Attrs: {dir(dest)}"
+                )
+                continue
+
+            logger.info(f"Downloading results from: {output_file}")
+
+            # Скачать JSONL файл через Files API
             try:
-                results = []
-                for line in response.text.strip().split("\n"):
-                    if line.strip():
-                        results.append(json.loads(line))
-            except json.JSONDecodeError as e:
+                file_content_bytes = client.files.download(file=output_file)
+                file_content = file_content_bytes.decode("utf-8")
+            except Exception as e:
                 logger.error(
-                    f"❌ Invalid JSON in batch {batch_id[:8]} results: {e}. "
-                    f"Marking batch and all tasks as FAILED."
+                    f"Failed to download results file for batch {batch_id[:8]}: {e}"
                 )
-                db.update_batch_status(batch_id, "FAILED")
+                continue
 
-                # Пометить все задачи как FAILED
-                tasks = db.get_tasks_by_batch(batch_id)
-                for task in tasks:
-                    db.update_task_failed(
-                        task["id"], error=f"Invalid JSON in batch results: {e}"
-                    )
+            # Парсить JSONL — каждая строка содержит {"key": "task_id", "response": {...}}
+            # или {"key": "task_id", "error": {...}}
+            results_by_key = {}
+            for line in file_content.strip().split("\n"):
+                if not line.strip():
+                    continue
+                try:
+                    parsed = json.loads(line)
+                    key = parsed.get("key")
+                    if key:
+                        results_by_key[key] = parsed
+                    else:
+                        logger.warning(f"Result line without key: {line[:100]}")
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Invalid JSON in result line: {e}")
 
-                continue  # Пропустить этот батч
-
-            # 4. Получить задачи в ТОМ ЖЕ порядке что отправляли (детерминированная сортировка)
-            tasks = db.get_tasks_by_batch(batch_id)
-            tasks.sort(key=lambda t: (t["created_at"], t["id"]))
-
-            # 🚨 КРИТИЧЕСКАЯ ВАЛИДАЦИЯ: Паранойя-режим
-            if len(results) != len(tasks):
-                logger.error(
-                    f"❌ CRITICAL: Batch {batch_id[:8]} result count mismatch! "
-                    f"Tasks: {len(tasks)}, Results: {len(results)}. "
-                    f"Possible Safety Filter corruption. Marking entire batch as FAILED."
-                )
-
-                # Пометить весь батч как FAILED
-                db.update_batch_status(batch_id, "FAILED")
-
-                # Пометить все задачи как FAILED с объяснением
-                for task in tasks:
-                    db.update_task_failed(
-                        task["id"],
-                        error="Result count mismatch (possible safety filter). Entire batch marked as FAILED for data integrity.",
-                    )
-
-                continue  # Пропустить этот батч, не инкрементировать processed_count
-
-            # 5. Обработать каждый результат (сопоставление по индексу)
             logger.info(
-                f"📦 Processing {len(results)} results for batch {batch_id[:8]}"
+                f"Parsed {len(results_by_key)} results for batch {batch_id[:8]}"
             )
 
-            for i, result in enumerate(results):
-                task = tasks[
-                    i
-                ]  # Безопасно: валидация len() выше гарантирует совпадение
+            # Получить задачи батча
+            tasks = db.get_tasks_by_batch(batch_id)
+
+            # Обработать каждую задачу по её key (task_id)
+            success_count = 0
+            fail_count = 0
+
+            for task in tasks:
                 task_id = task["id"]
+                result = results_by_key.get(task_id)
+
+                if not result:
+                    logger.warning(f"No result found for task {task_id[:8]}")
+                    db.update_task_failed(task_id, error="No result in batch response")
+                    fail_count += 1
+                    continue
 
                 # Проверка на ошибку в результате
                 if "error" in result:
-                    error_msg = result["error"].get("message", "Unknown error")
-                    logger.warning(f"❌ Task {task_id[:8]} failed: {error_msg}")
+                    error_msg = result["error"].get("message", str(result["error"]))
+                    logger.warning(f"Task {task_id[:8]} failed: {error_msg}")
                     db.update_task_failed(task_id, error=error_msg)
-                else:
+                    fail_count += 1
+                elif "response" in result:
                     # Успех: извлечь и сохранить изображение
                     try:
-                        base64_data = _extract_image_data(result)
+                        base64_data = _extract_image_data_from_dict(result["response"])
                         local_path = _save_image(
                             batch_id, task_id, base64_data, task.get("target_path")
                         )
                         db.update_task_completed(task_id, local_path=local_path)
-                        logger.debug(f"✅ Task {task_id[:8]} completed: {local_path}")
+                        logger.debug(f"Task {task_id[:8]} completed: {local_path}")
+                        success_count += 1
                     except Exception as e:
-                        logger.error(f"❌ Failed to save task {task_id[:8]}: {e}")
+                        logger.error(f"Failed to save task {task_id[:8]}: {e}")
                         db.update_task_failed(task_id, error=f"Save error: {e}")
+                        fail_count += 1
+                else:
+                    logger.warning(f"Task {task_id[:8]} has no response or error")
+                    db.update_task_failed(task_id, error="Empty result")
+                    fail_count += 1
 
-            # 6. Закрыть батч
+            # Закрыть батч
             db.update_batch_completed(batch_id)
             logger.info(
-                f"✅ Batch {batch_id[:8]} completed: {len(results)} tasks processed"
+                f"Batch {batch_id[:8]} completed: {success_count} success, {fail_count} failed"
             )
             processed_count += 1
 
         except Exception as e:
-            logger.error(f"❌ Failed to retrieve batch {batch_id[:8]}: {e}")
+            logger.error(f"Failed to retrieve batch {batch_id[:8]}: {e}")
             # НЕ помечаем как FAILED при ошибке скачивания (может быть transient)
             # Повторим в следующем цикле
 
     logger.info(
-        f"📥 Retrieval complete: {processed_count}/{len(completed_batches)} batches processed"
+        f"Retrieval complete: {processed_count}/{len(completed_batches)} batches processed"
     )
     return processed_count
 
 
-def _extract_image_data(result: dict) -> str:
+def _extract_image_data_from_dict(response: dict) -> str:
     """
-    Извлечь base64 данные изображения из результата Google Batch API.
+    Извлечь base64 данные изображения из dict ответа Google Batch API.
+
+    Структура ответа (file-based JSONL):
+    response["candidates"][0]["content"]["parts"][0]["inlineData"]["data"]
+
+    Также поддерживает старый формат с "inline_data" (snake_case).
 
     Args:
-        result: Распарсенная строка JSONL
+        response: Dict с ответом из JSONL файла
 
     Returns:
-        Base64 строка (без префикса data:image/png;base64,)
+        Base64 строка
 
     Raises:
-        KeyError: Если структура ответа не соответствует ожидаемой
-        ValueError: Если нет inline_data в результате
+        ValueError: Если нет данных изображения в ответе
     """
-    candidate = result["response"]["candidates"][0]
-    part = candidate["content"]["parts"][0]
+    try:
+        candidate = response["candidates"][0]
+        parts = candidate["content"]["parts"]
 
-    if "inline_data" not in part:
-        raise ValueError("No inline_data in response (expected image data)")
+        # Ищем часть с изображением (может быть text + image)
+        for part in parts:
+            # Проверяем оба формата: camelCase (из JSONL) и snake_case
+            inline_data = part.get("inlineData") or part.get("inline_data")
+            if inline_data:
+                data = inline_data.get("data")
+                if data:
+                    return data
 
-    return part["inline_data"]["data"]
+        raise ValueError("No image data found in any part")
+
+    except (KeyError, IndexError, TypeError) as e:
+        raise ValueError(f"Failed to extract image data from response: {e}")
 
 
 def _save_image(
