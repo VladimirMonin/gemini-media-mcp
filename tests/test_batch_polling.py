@@ -1,12 +1,10 @@
-"""
-Тесты для Фазы 3 Шаг 2: Batch Polling (отслеживание статусов).
+"""Тесты для Batch Polling — отслеживание статусов пакетов.
 
 Проверяет функцию poll_active_batches():
 - Mock режим с fake batch IDs
-- Корректный маппинг статусов Google → DB
-- Обновление только при изменении статуса
+- Маппинг статусов Google → DB
+- Обновление при изменении статуса
 - Обработка ошибок (404, пустые батчи)
-- Опциональный real API тест
 """
 
 import os
@@ -22,7 +20,7 @@ ENABLE_BATCH_API = os.getenv("ENABLE_BATCH_API", "false").lower() == "true"
 
 @pytest.fixture
 def temp_db(tmp_path):
-    """Временная БД для изолированных тестов."""
+    """Создаёт временную БД для изолированных тестов."""
     db_path = tmp_path / "test_polling.db"
     db = DatabaseManager()
     db.initialize(str(db_path))
@@ -35,7 +33,7 @@ def temp_db(tmp_path):
 
 @pytest.fixture
 def mock_mode(monkeypatch):
-    """Фикстура для mock режима (отключает реальный API)."""
+    """Отключает реальный API для тестирования."""
     import worker.processors.batch_processor as bp
 
     monkeypatch.setattr(bp, "ENABLE_BATCH_API", False)
