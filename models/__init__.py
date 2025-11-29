@@ -1,7 +1,12 @@
-"""Data models for structured responses.
+"""Модели данных для структурированных ответов.
 
-This package contains Pydantic models for image analysis responses,
-audio analysis responses, and error handling.
+Классы:
+    ImageAnalysisResponse
+        Модель ответа анализа изображения.
+    AudioAnalysisResponse
+        Модель ответа анализа аудио.
+    ErrorResponse
+        Модель ответа с ошибкой.
 """
 
 from models.analysis import AudioAnalysisResponse, ErrorResponse, ImageAnalysisResponse
