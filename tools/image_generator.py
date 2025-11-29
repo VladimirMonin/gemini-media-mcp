@@ -1,9 +1,4 @@
-"""Инструмент генерации изображений через Gemini API.
-
-Функции:
-    generate_image(prompt: str, output_path: str, ...) -> str
-        Генерирует изображение из текста или редактирует существующее.
-"""
+"""Image generation tool for the Gemini Media MCP server."""
 
 import os
 from datetime import datetime
@@ -28,7 +23,7 @@ logger = get_logger(__name__)
 
 
 def _resolve_path(path: str) -> str:
-    """Преобразует относительные пути в абсолютные."""
+    """Converts relative paths/user inputs to absolute system paths."""
     if not path:
         return ""
     return os.path.abspath(os.path.expanduser(path))
@@ -42,22 +37,45 @@ def generate_image(
     resolution: str = "1K",
     model_type: Literal["fast", "pro"] = "fast",
 ) -> str:
-    """Генерирует или редактирует изображение через Gemini API.
+    """
+    Generate a new image from text OR edit an existing image using Google Gemini models.
+
+    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
+    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
+
+    ⚠️ TIER REQUIREMENTS:
+    - **Free Tier**: Image generation is NOT AVAILABLE. You must upgrade to Tier 1.
+    - **Tier 1**: Full access to all image generation models (both 'fast' and 'pro').
+
+    To configure your tier, set GEMINI_TIER=tier1 in your .env file.
+    See https://ai.google.dev/pricing for tier details and upgrade instructions.
+
+    Use this tool when the user wants to:
+    1. Create an image from scratch (Text-to-Image).
+    2. Edit an existing image (Image-to-Image / Inpainting).
+    3. Transform the style of an image.
+
+    IMPORTANT GUIDELINES FOR THE AGENT:
+    1. **Prompt Translation**: You MUST translate the user's request into a detailed, descriptive ENGLISH prompt before calling this tool. Gemini image models REQUIRE English prompts for best results. Non-English prompts will produce poor quality or fail.
+    2. **Output Path**: You MUST provide a valid, absolute file path for `output_path`. Ask the user for a location if unclear, or determine a sensible path based on the user's environment (e.g., Desktop or project folder).
+    3. **Editing**: If the user wants to edit an image, you MUST provide the absolute path to that image in `image_paths` and describe the desired result in the `prompt` (e.g., "A photo of a cat wearing a wizard hat").
+    4. **Model Selection**:
+       - Use `model_type='fast'` (Gemini 2.5 Flash) for quick drafts, iterations, or when speed is priority. Note: It ONLY supports '1K' resolution.
+       - Use `model_type='pro'` (Gemini 3 Pro) for high-quality art, precise text rendering within images, complex instruction following, or when '2K' resolution is requested.
 
     Args:
-        prompt: Детальное описание желаемого изображения на английском.
-        output_path: Абсолютный путь для сохранения файла.
-        image_paths: Список путей к референсным изображениям.
-        aspect_ratio: Соотношение сторон.
-        resolution: Разрешение ('1K' или '2K').
-        model_type: Тип модели ('fast' или 'pro').
+        prompt (str): A highly detailed description of the desired image in ENGLISH.
+        output_path (str): REQUIRED. The absolute path where the generated image file will be saved (e.g., "C:/Users/User/Desktop/result.png").
+        image_paths (Optional[List[str]]): List of absolute file paths to reference images (for editing, style transfer, or composition). Max 5 images.
+        aspect_ratio (str): The aspect ratio of the output image.
+                            Allowed values: '1:1', '16:9', '9:16', '4:3', '3:4', '2:3', '3:2', '4:5', '5:4', '21:9'.
+                            Default is '16:9'.
+        resolution (str): The output resolution. Allowed values: '1K', '2K'.
+                          Note: '2K' is ONLY supported when `model_type` is 'pro'. If 'fast' is selected, this will be forced to '1K'.
+        model_type (Literal['fast', 'pro']): Selects the underlying model. 'fast' is faster/cheaper, 'pro' is higher quality. Default is 'fast'.
 
     Returns:
-        Абсолютный путь к сохранённому изображению.
-
-    Raises:
-        ValueError: Неверные параметры или tier не поддерживает генерацию.
-        FileNotFoundError: Референсные изображения не найдены.
+        str: The absolute path to the saved image file on success.
     """
     # --- 0. Pre-validation logging ---
     logger.info(

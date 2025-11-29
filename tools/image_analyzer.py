@@ -1,11 +1,4 @@
-"""Инструмент анализа изображений через Gemini API.
-
-Функции:
-    get_system_instruction(name: str, override: str, file_path: str) -> str | None
-        Получает системную инструкцию с приоритетной обработкой.
-    analyze_image(image_path: str, ...) -> ImageAnalysisResponse | ErrorResponse
-        Анализирует изображение и возвращает структурированный результат.
-"""
+"""Image analysis tool for the Gemini Media MCP server."""
 
 import json
 from PIL import Image
@@ -26,21 +19,24 @@ logger = get_logger(__name__)
 def get_system_instruction(
     name: str = "default", override: str | None = None, file_path: str | None = None
 ) -> str | None:
-    """Получает системную инструкцию с приоритетной обработкой.
+    """Get system instruction with priority handling.
 
-    Приоритет: file_path > override > name (из словаря).
+    Priority order:
+    1. File path (highest priority)
+    2. Custom override
+    3. Predefined instruction by name
 
     Args:
-        name: Имя предопределённой инструкции.
-        override: Пользовательская инструкция.
-        file_path: Путь к файлу с инструкцией.
+        name: Name of predefined system instruction.
+        override: Custom system instruction string.
+        file_path: Path to file with system instruction.
 
     Returns:
-        Текст системной инструкции или None.
+        System instruction string or None if not found.
 
     Raises:
-        FileNotFoundError: Если файл инструкции не найден.
-        IOError: Ошибка чтения файла.
+        FileNotFoundError: If system instruction file not found.
+        IOError: If error reading system instruction file.
     """
     if file_path:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -58,25 +54,30 @@ def analyze_image(
     system_instruction_override: str | None = None,
     system_instruction_file_path: str | None = None,
 ) -> ImageAnalysisResponse | ErrorResponse:
-    """Анализирует изображение через Google Gemini API.
+    """Analyze images using Google Gemini API.
 
-    Возвращает структурированный результат с alt-text и детальным анализом.
-    Поддерживаемые форматы: JPEG, PNG, GIF, WEBP, HEIC, HEIF.
+    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
+    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
+
+    Returns structured result with alt-text and detailed analysis.
+    Supported formats: JPEG, PNG, GIF, WEBP, HEIC, HEIF
 
     Args:
-        image_path: Абсолютный путь к файлу изображения.
-        user_prompt: Пользовательский запрос на анализ.
-        model_name: Модель Gemini (по умолчанию из config.py).
-        system_instruction_name: Имя предопределённой инструкции.
-        system_instruction_override: Пользовательская инструкция.
-        system_instruction_file_path: Путь к файлу с инструкцией.
+        image_path: Absolute path to the image file on local machine.
+        user_prompt: Custom analysis request (optional).
+        model_name: The Gemini model to use (e.g., "gemini-2.5-flash").
+                    Defaults to the one specified in config.py.
+        system_instruction_name: Name of predefined system instruction.
+        system_instruction_override: Custom system instruction (overrides system_instruction_name).
+        system_instruction_file_path: Path to file with system instruction (highest priority).
 
     Returns:
-        Структурированный ответ анализа или ошибка.
+        Structured analysis response with alt-text and detailed analysis.
 
     Raises:
-        ValueError: Неверный формат изображения или инструкция не найдена.
-        FileNotFoundError: Файл изображения или инструкции не найден.
+        ValueError: If image is invalid or system instruction not found.
+        FileNotFoundError: If image file or system instruction file not found.
+        IOError: If error reading files.
     """
     logger.info("=" * 80)
     logger.info(f"🖼️  IMAGE ANALYSIS STARTED: {image_path}")
