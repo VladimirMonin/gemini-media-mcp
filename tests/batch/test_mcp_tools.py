@@ -169,13 +169,22 @@ class TestQueueGenerateAudio:
     """Tests for queue_generate_audio tool."""
 
     def test_creates_task_with_valid_text(self, mock_db):
-        """Should create TTS task with valid text."""
+        """Should create TTS task with valid text.
+
+        Note:
+            queue_generate_audio теперь использует create_batch_with_tasks,
+            а не create_task напрямую.
+        """
         result = queue_generate_audio(text="Hello, world!")
 
         assert "task_id" in result
         assert result["status"] == "PENDING"
         assert result["voice"] == "puck"
-        mock_db.create_task.assert_called_once()
+        # Проверяем что был создан batch с задачей
+        mock_db.create_batch_with_tasks.assert_called_once()
+        call_args = mock_db.create_batch_with_tasks.call_args
+        assert call_args[1]["operation_type"] == "TTS_GEN_QUEUE"
+        assert len(call_args[1]["tasks"]) == 1
 
     def test_validates_empty_text(self, mock_db):
         """Should reject empty text."""
@@ -219,11 +228,17 @@ class TestQueueGenerateAudio:
         assert result["voice"] == "puck"
 
     def test_task_has_null_target_path(self, mock_db):
-        """Task should have target_path=None (worker decides)."""
+        """Task should have target_path=None (worker decides).
+
+        Note:
+            queue_generate_audio теперь использует create_batch_with_tasks.
+        """
         queue_generate_audio(text="Hello")
 
-        call_args = mock_db.create_task.call_args
-        assert call_args[1]["target_path"] is None
+        call_args = mock_db.create_batch_with_tasks.call_args
+        tasks = call_args[1]["tasks"]
+        assert len(tasks) == 1
+        assert tasks[0]["target_path"] is None
 
     def test_uses_correct_model_for_flash(self, mock_db):
         """Should use flash TTS model."""

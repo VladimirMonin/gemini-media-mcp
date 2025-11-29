@@ -270,10 +270,10 @@ def process_local_queue_tasks(db, *, mock_mode: bool = False) -> int:
             )
         else:
             # Реальный вызов TTS API
-            audio_base64 = _generate_tts(text, voice, model_type)
+            audio_pcm_data = _generate_tts(text, voice, model_type)
 
             # Сохранить аудио
-            result_path = _save_tts_audio(task_id, audio_base64, target_path)
+            result_path = _save_tts_audio(task_id, audio_pcm_data, target_path)
 
         # Обновить статус на COMPLETED
         db.update_task_completed(task_id, result_path)

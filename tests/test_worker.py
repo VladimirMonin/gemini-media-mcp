@@ -132,14 +132,16 @@ class TestLocalQueueProcessing:
         monkeypatch.setattr(config, "OUTPUT_TTS_DIR", str(tmp_path / "media" / "tts"))
 
         # Настроить мок Gemini API
+        import base64
+
         mock_response = MagicMock()
         mock_response.candidates = [MagicMock()]
         mock_response.candidates[0].content.parts = [MagicMock()]
         mock_response.candidates[0].content.parts[0].inline_data = MagicMock()
-        # Base64 minimal WAV
+        # RAW PCM bytes (как реальный API)
         mock_response.candidates[0].content.parts[
             0
-        ].inline_data.data = (
+        ].inline_data.data = base64.b64decode(
             "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
         )
         mock_client = MagicMock()

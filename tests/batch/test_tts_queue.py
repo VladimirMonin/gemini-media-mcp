@@ -49,15 +49,21 @@ def tts_task_data():
 
 @pytest.fixture
 def mock_genai_response():
-    """Мок ответа от Gemini TTS API."""
+    """Мок ответа от Gemini TTS API.
+
+    Returns:
+        MagicMock: Объект с декодированными PCM bytes (как реальный API).
+    """
+    import base64
+
     mock_response = MagicMock()
     mock_response.candidates = [MagicMock()]
     mock_response.candidates[0].content.parts = [MagicMock()]
-    # Base64 encoded minimal WAV header (не реальный WAV, но достаточно для теста)
+    # RAW PCM bytes (как реальный Gemini TTS API)
     mock_response.candidates[0].content.parts[0].inline_data = MagicMock()
-    mock_response.candidates[0].content.parts[
-        0
-    ].inline_data.data = "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
+    mock_response.candidates[0].content.parts[0].inline_data.data = base64.b64decode(
+        "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
+    )
     return mock_response
 
 
@@ -166,14 +172,18 @@ class TestSaveTTSAudio:
 
     def test_save_to_default_path(self, tmp_path, monkeypatch):
         """Сохранение в media/tts/{task_id}.wav если target_path не указан."""
+        import base64
+
         # Подменить OUTPUT_TTS_DIR на tmp_path
         monkeypatch.setattr(config, "OUTPUT_TTS_DIR", str(tmp_path / "media" / "tts"))
 
         task_id = str(uuid4())
-        # Минимальный WAV (base64)
-        audio_base64 = "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
+        # RAW PCM bytes (как реальный API)
+        audio_pcm = base64.b64decode(
+            "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
+        )
 
-        result_path = _save_tts_audio(task_id, audio_base64, target_path=None)
+        result_path = _save_tts_audio(task_id, audio_pcm, target_path=None)
 
         assert Path(result_path).exists()
         assert task_id in result_path
@@ -181,13 +191,15 @@ class TestSaveTTSAudio:
 
     def test_save_to_custom_path(self, tmp_path):
         """Сохранение в указанный target_path."""
+        import base64
+
         custom_path = tmp_path / "custom" / "audio.wav"
         task_id = str(uuid4())
-        audio_base64 = "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
-
-        result_path = _save_tts_audio(
-            task_id, audio_base64, target_path=str(custom_path)
+        audio_pcm = base64.b64decode(
+            "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
         )
+
+        result_path = _save_tts_audio(task_id, audio_pcm, target_path=str(custom_path))
 
         assert Path(result_path).exists()
         assert "custom" in result_path
@@ -195,13 +207,17 @@ class TestSaveTTSAudio:
 
     def test_creates_parent_directories(self, tmp_path, monkeypatch):
         """Создаёт родительские директории если их нет."""
+        import base64
+
         deep_path = tmp_path / "a" / "b" / "c" / "d"
         monkeypatch.setattr(config, "OUTPUT_TTS_DIR", str(deep_path))
 
         task_id = str(uuid4())
-        audio_base64 = "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
+        audio_pcm = base64.b64decode(
+            "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
+        )
 
-        result_path = _save_tts_audio(task_id, audio_base64, target_path=None)
+        result_path = _save_tts_audio(task_id, audio_pcm, target_path=None)
 
         assert Path(result_path).exists()
         assert deep_path.exists()
@@ -315,7 +331,11 @@ class TestProcessLocalQueueTasksWithMockedAPI:
         monkeypatch,
         mock_genai_response,
     ):
-        """Тест реального API вызова через мок."""
+        """Тест реального API вызова через мок.
+
+        Note:
+            Использует mock_genai_response фикстуру, которая возвращает bytes.
+        """
         # Подменить OUTPUT_TTS_DIR
         monkeypatch.setattr(config, "OUTPUT_TTS_DIR", str(tmp_path / "media" / "tts"))
 

@@ -163,6 +163,7 @@ class TestBatchSubmission:
         batch = temp_db.get_batch(empty_batch_id)
         assert batch["status"] == "PENDING", "Пустой пакет должен остаться PENDING"
 
+    @pytest.mark.paid
     @pytest.mark.skipif(
         not ENABLE_BATCH_API or os.getenv("CI") == "true",
         reason="Пропускается в CI или если ENABLE_BATCH_API=false",
@@ -175,6 +176,7 @@ class TestBatchSubmission:
         - Реальный GEMINI_API_KEY в config.py
         - ENABLE_BATCH_API=true
         - Не запускается в CI (стоит skip marker)
+        - Помечен @pytest.mark.paid (реальный API → расход квоты)
 
         Этот тест создаёт реальный batch в Google Batch API!
         """
