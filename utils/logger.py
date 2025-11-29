@@ -1,7 +1,8 @@
-"""Centralized logging configuration for the MCP server.
+"""Централизованная конфигурация логирования MCP сервера.
 
-Provides a unified logger with file and console output, proper formatting,
-and log rotation to prevent disk space issues.
+Функции:
+    get_logger(name: str) -> logging.Logger
+        Получает настроенный экземпляр логгера с файловым и консольным выводом.
 """
 
 import logging
@@ -11,13 +12,13 @@ from pathlib import Path
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Get a configured logger instance.
+    """Получает настроенный экземпляр логгера.
 
     Args:
-        name: Logger name (typically __name__ from the calling module).
+        name: Имя логгера (обычно __name__ из вызывающего модуля).
 
     Returns:
-        Configured logger instance with file and console handlers.
+        Настроенный логгер с файловым и консольным хендлерами.
     """
     logger = logging.getLogger(name)
 

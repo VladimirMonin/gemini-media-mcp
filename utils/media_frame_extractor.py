@@ -1,8 +1,8 @@
-"""Universal media frame extraction for GIF and Video files.
+"""Универсальное извлечение кадров из GIF и видеофайлов.
 
-This module provides unified frame extraction functionality for both
-animated GIFs and video files, with three extraction modes and in-memory
-WEBP conversion for optimal size/quality balance.
+Функции:
+    extract_frames(source: Union[str, Image.Image], mode: str, ...) -> tuple[list[str], dict]
+        Извлекает и оптимизирует кадры из видео или GIF.
 """
 
 import base64
@@ -25,51 +25,32 @@ logger = get_logger(__name__)
 def extract_frames(
     source: Union[str, Image.Image],
     mode: Literal["fps", "total", "interval"] = "total",
-    # Mode parameters
     frame_count: Optional[int] = 10,
     fps: Optional[float] = None,
     interval_sec: Optional[float] = None,
-    # Quality parameters
     max_dimension: int = 1920,
     output_format: Literal["webp", "jpeg", "png"] = "webp",
     quality: int = 80,
 ) -> tuple[list[str], dict]:
-    """Extract and optimize frames from video or GIF.
+    """Извлекает и оптимизирует кадры из видео или GIF.
 
     Args:
-        source: Video file path (str) or PIL Image (for GIF)
-        mode: Extraction mode ('fps', 'total', 'interval')
-        frame_count: Number of frames for 'total' mode (default: 10)
-        fps: Frames per second for 'fps' mode
-        interval_sec: Interval in seconds for 'interval' mode
-        max_dimension: Max dimension for resizing (default: 1920 for 1080p)
-        output_format: Output format ('webp', 'jpeg', 'png')
-        quality: Compression quality (1-100, default: 80)
+        source: Путь к видео или PIL Image для GIF.
+        mode: Режим извлечения ('fps', 'total', 'interval').
+        frame_count: Количество кадров для режима 'total'.
+        fps: Кадров в секунду для режима 'fps'.
+        interval_sec: Интервал в секундах для режима 'interval'.
+        max_dimension: Максимальное измерение для ресайза.
+        output_format: Формат вывода ('webp', 'jpeg', 'png').
+        quality: Качество сжатия (1-100).
 
     Returns:
-        Tuple of (frames_base64, metadata):
-            frames_base64: List of base64-encoded frame strings
-            metadata: Dict with frame_count, total_size_mb, avg_frame_size_kb, resolution
+        Кортеж (frames_base64, metadata).
 
     Raises:
-        ValueError: If invalid parameters or file format
-        FileNotFoundError: If video file not found
-        RuntimeError: If frame extraction fails
-
-    Examples:
-        # Extract 30 frames from video (evenly distributed)
-        frames, meta = extract_frames("video.mp4", mode="total", frame_count=30)
-
-        # Extract at 0.5 FPS (1 frame every 2 seconds)
-        frames, meta = extract_frames("video.mp4", mode="fps", fps=0.5)
-
-        # Extract frame every 10 seconds
-        frames, meta = extract_frames("video.mp4", mode="interval", interval_sec=10)
-
-        # Extract from GIF
-        from PIL import Image
-        gif = Image.open("animation.gif")
-        frames, meta = extract_frames(gif, mode="total", frame_count=20)
+        ValueError: Неверные параметры или формат файла.
+        FileNotFoundError: Видеофайл не найден.
+        RuntimeError: Ошибка извлечения кадров.
     """
     # Determine if source is GIF or video
     is_gif = isinstance(source, Image.Image)
@@ -139,10 +120,7 @@ def _extract_gif_frames(
     frame_count: Optional[int],
     interval_sec: Optional[float],
 ) -> list[Image.Image]:
-    """Extract frames from animated GIF.
-
-    Uses logic from gif_processor.py for consistency.
-    """
+    """Извлекает кадры из анимированного GIF."""
     if not getattr(image, "is_animated", False):
         logger.info("GIF is not animated, returning single frame")
         return [_convert_frame(image)]
@@ -196,22 +174,7 @@ def _extract_video_frames(
     frame_count: Optional[int],
     interval_sec: Optional[float],
 ) -> list[Image.Image]:
-    """Extract frames from video file using imageio-ffmpeg.
-
-    Args:
-        video_path: Path to video file
-        mode: Extraction mode
-        fps: Target FPS for 'fps' mode
-        frame_count: Number of frames for 'total' mode
-        interval_sec: Interval for 'interval' mode
-
-    Returns:
-        List of PIL Image frames
-
-    Raises:
-        FileNotFoundError: If video file not found
-        ValueError: If invalid parameters
-    """
+    """Извлекает кадры из видеофайла через imageio-ffmpeg."""
     # Get video metadata
     try:
         import math
@@ -375,16 +338,7 @@ def _extract_video_frames(
 def _convert_to_base64(
     image: Image.Image, output_format: str, quality: int
 ) -> tuple[str, int]:
-    """Convert PIL Image to base64-encoded string.
-
-    Args:
-        image: PIL Image
-        output_format: 'webp', 'jpeg', or 'png'
-        quality: Compression quality (1-100)
-
-    Returns:
-        Tuple of (base64_string, size_in_bytes)
-    """
+    """Конвертирует PIL Image в base64-строку."""
     buffer = io.BytesIO()
 
     # Convert format name to PIL format

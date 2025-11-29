@@ -1,7 +1,16 @@
-"""Google Gemini API client for image analysis.
+"""Клиент Google Gemini API для анализа медиа-контента.
 
-This module provides a wrapper around the Google Gemini API for analyzing
-images with custom prompts and system instructions.
+Классы:
+    GeminiClient
+        Клиент для работы с Gemini API.
+
+        Методы:
+            generate_content(prompt: str, ...) -> str
+                Генерирует контент с медиа.
+            generate_text(prompt: str) -> str
+                Генерирует текст по промпту.
+            generate_content_multi_image(prompt: str, images: Sequence) -> str
+                Генерирует контент с несколькими изображениями.
 """
 
 import json
@@ -18,25 +27,18 @@ logger = get_logger(__name__)
 
 
 class GeminiClient:
-    """Client wrapper for Google Gemini API interactions.
-
-    Provides methods for analyzing images using Google's Gemini models
-    with support for custom prompts and system instructions.
+    """Клиент для работы с Google Gemini API.
 
     Attributes:
-        model_name: The name of the Gemini model to use.
-        client: The configured Google Gemini API client.
+        model_name: Имя модели Gemini.
+        client: Настроенный клиент Google Gemini API.
     """
 
     def __init__(self, model_name: str = DEFAULT_GEMINI_MODEL):
-        """Initialize the Gemini client.
-
-        Args:
-            model_name: Name of the Gemini model to use.
-        """
+        """Инициализирует клиент Gemini."""
         self.model_name = model_name
         self.client = Client(api_key=GEMINI_API_KEY)
-        logger.info(f"Initialized GeminiClient with model: {model_name}")
+        logger.info(f"🔧 Инициализирован GeminiClient: {model_name}")
 
     def generate_content(
         self,
@@ -47,18 +49,18 @@ class GeminiClient:
         system_instruction: Optional[str] = None,
         response_schema=None,
     ) -> str:
-        """Generate content with media using the Gemini API.
+        """Генерирует контент с медиа через Gemini API.
 
         Args:
-            prompt: The text prompt for the model.
-            image_path: Optional path to an image file.
-            media_bytes: Optional media data in bytes.
-            mime_type: The MIME type of the media_bytes.
-            system_instruction: Optional system instruction for the model.
-            response_schema: Optional Pydantic model for structured response.
+            prompt: Текстовый промпт.
+            image_path: Путь к изображению.
+            media_bytes: Медиа-данные в байтах.
+            mime_type: MIME-тип медиа.
+            system_instruction: Системная инструкция.
+            response_schema: Pydantic модель для структурированного ответа.
 
         Returns:
-            The raw text response from the model.
+            Текстовый ответ модели.
         """
         try:
             media_part = None
@@ -105,7 +107,7 @@ class GeminiClient:
 
             config = types.GenerateContentConfig(**config_params)
 
-            logger.info("Sending content generation request to Gemini.")
+            logger.info("🚀 Отправка запроса на генерацию в Gemini")
             response = self.client.models.generate_content(
                 model=self.model_name, contents=contents, config=config
             )
@@ -113,11 +115,10 @@ class GeminiClient:
             if hasattr(response, "text"):
                 return response.text or ""
 
-            # Handle cases where the response might be blocked
             if hasattr(response, "prompt_feedback") and response.prompt_feedback:
                 feedback = response.prompt_feedback
                 if hasattr(feedback, "block_reason") and feedback.block_reason:
-                    logger.warning(f"Request blocked: {feedback.block_reason}")
+                    logger.warning(f"⚠️ Запрос заблокирован: {feedback.block_reason}")
                     raise ValueError(
                         f"Request blocked by safety filters: {feedback.block_reason}"
                     )
@@ -125,19 +126,11 @@ class GeminiClient:
             raise ValueError("Failed to get a valid response from Gemini model.")
 
         except Exception as e:
-            logger.exception(f"Unexpected error during content generation: {e}")
+            logger.exception(f"❌ Ошибка генерации контента: {e}")
             raise
 
     def generate_text(self, prompt: str, **kwargs) -> str:
-        """Generate text based on a prompt.
-
-        Args:
-            prompt: The text prompt for generation.
-            **kwargs: Additional arguments for the API call.
-
-        Returns:
-            Generated text response.
-        """
+        """Генерирует текст на основе промпта."""
         logger.debug(f"Generating text for prompt: {prompt[:50]}...")
         response = self.client.models.generate_content(
             model=self.model_name, contents=prompt, **kwargs
@@ -153,34 +146,18 @@ class GeminiClient:
         temperature: float = 0.7,
         max_output_tokens: int = 4096,
     ) -> str:
-        """Generate content with multiple images using Gemini API.
-
-        Supports mixing:
-        - File paths (str)
-        - PIL Image objects
-        - types.Part objects (for File API references)
+        """Генерирует контент с несколькими изображениями.
 
         Args:
-            prompt: Text prompt for analysis
-            images: List of images in various formats
-            system_instruction: Optional system instruction
-            response_schema: Optional Pydantic model for structured output
-            temperature: Sampling temperature (0.0-2.0)
-            max_output_tokens: Maximum tokens in response
+            prompt: Текстовый промпт для анализа.
+            images: Список изображений (пути, PIL Image или types.Part).
+            system_instruction: Системная инструкция.
+            response_schema: Pydantic модель для структурированного ответа.
+            temperature: Температура генерации (0.0-2.0).
+            max_output_tokens: Максимум токенов в ответе.
 
         Returns:
-            Text response from model
-
-        Examples:
-            # Mix of formats
-            response = client.generate_content_multi_image(
-                prompt="Compare these images",
-                images=[
-                    "path/to/image1.jpg",  # file path
-                    pil_image,              # PIL Image
-                    uploaded_file_part      # types.Part from File API
-                ]
-            )
+            Текстовый ответ модели.
         """
         try:
             # Convert all images to appropriate format
@@ -238,7 +215,7 @@ class GeminiClient:
 
             config = types.GenerateContentConfig(**config_params)
 
-            logger.info(f"Sending {len(images)} images to Gemini ({self.model_name})")
+            logger.info(f"🚀 Отправка {len(images)} изображений в Gemini ({self.model_name})")
             response = self.client.models.generate_content(
                 model=self.model_name, contents=content_parts, config=config
             )
@@ -246,11 +223,10 @@ class GeminiClient:
             if hasattr(response, "text"):
                 return response.text or ""
 
-            # Handle blocked responses
             if hasattr(response, "prompt_feedback") and response.prompt_feedback:
                 feedback = response.prompt_feedback
                 if hasattr(feedback, "block_reason") and feedback.block_reason:
-                    logger.warning(f"Request blocked: {feedback.block_reason}")
+                    logger.warning(f"⚠️ Запрос заблокирован: {feedback.block_reason}")
                     raise ValueError(
                         f"Request blocked by safety filters: {feedback.block_reason}"
                     )
@@ -258,5 +234,5 @@ class GeminiClient:
             raise ValueError("Failed to get a valid response from Gemini model.")
 
         except Exception as e:
-            logger.exception(f"Error in multi-image content generation: {e}")
+            logger.exception(f"❌ Ошибка генерации с изображениями: {e}")
             raise
