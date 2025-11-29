@@ -1,4 +1,11 @@
-"""Audio analysis tool for the Gemini Media MCP server."""
+"""Инструмент анализа аудио через Gemini API.
+
+Функции:
+    get_system_instruction(name: str, override: str, file_path: str, prompts_dict: dict) -> str | None
+        Получает системную инструкцию с приоритетной обработкой.
+    analyze_audio(audio_path: str, ...) -> AudioAnalysisResponse | ErrorResponse
+        Анализирует аудиофайл и возвращает структурированный результат.
+"""
 
 import json
 import os
@@ -23,25 +30,22 @@ def get_system_instruction(
     file_path: str | None = None,
     prompts_dict: dict = AVAILABLE_AUDIO_ANALYSIS_PROMPTS,
 ) -> str | None:
-    """Get system instruction with priority handling.
+    """Получает системную инструкцию с приоритетной обработкой.
 
-    Priority order:
-    1. File path (highest priority)
-    2. Custom override
-    3. Predefined instruction by name
+    Приоритет: file_path > override > name (из словаря).
 
     Args:
-        name: Name of predefined system instruction.
-        override: Custom system instruction string.
-        file_path: Path to file with system instruction.
-        prompts_dict: Dictionary containing predefined prompts.
+        name: Имя предопределённой инструкции.
+        override: Пользовательская инструкция.
+        file_path: Путь к файлу с инструкцией.
+        prompts_dict: Словарь предопределённых промптов.
 
     Returns:
-        System instruction string or None if not found.
+        Текст системной инструкции или None.
 
     Raises:
-        FileNotFoundError: If system instruction file not found.
-        IOError: If error reading system instruction file.
+        FileNotFoundError: Если файл инструкции не найден.
+        IOError: Ошибка чтения файла.
     """
     if file_path:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -59,30 +63,25 @@ def analyze_audio(
     system_instruction_override: str | None = None,
     system_instruction_file_path: str | None = None,
 ) -> AudioAnalysisResponse | ErrorResponse:
-    """Analyzes an audio file using the Gemini API.
+    """Анализирует аудиофайл через Gemini API.
 
-    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
-    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
-
-    Returns structured analysis response with title, summary, transcription,
-    participants, hashtags, and action items.
+    Возвращает структурированный ответ с заголовком, резюме, транскрипцией,
+    участниками, хештегами и задачами.
 
     Args:
-        audio_path: Absolute path to the audio file on local machine.
-        user_prompt: Custom analysis request (optional).
-        model_name: The Gemini model to use (e.g., "gemini-2.5-flash").
-                    Defaults to the one specified in config.py.
-        system_instruction_name: Name of predefined system instruction.
-        system_instruction_override: Custom system instruction (overrides system_instruction_name).
-        system_instruction_file_path: Path to file with system instruction (highest priority).
+        audio_path: Абсолютный путь к аудиофайлу.
+        user_prompt: Пользовательский запрос на анализ.
+        model_name: Модель Gemini (по умолчанию из config.py).
+        system_instruction_name: Имя предопределённой инструкции.
+        system_instruction_override: Пользовательская инструкция.
+        system_instruction_file_path: Путь к файлу с инструкцией.
 
     Returns:
-        Structured analysis response or error response.
+        Структурированный ответ анализа или ошибка.
 
     Raises:
-        ValueError: If audio file is invalid or system instruction not found.
-        FileNotFoundError: If audio file or system instruction file not found.
-        IOError: If error reading files.
+        ValueError: Неверный формат аудио или инструкция не найдена.
+        FileNotFoundError: Файл аудио или инструкции не найден.
     """
     logger.info("=" * 80)
     logger.info(f"🎵 AUDIO ANALYSIS STARTED: {audio_path}")

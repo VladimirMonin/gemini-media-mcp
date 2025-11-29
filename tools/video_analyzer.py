@@ -1,8 +1,8 @@
-"""Video analysis tool for the Gemini Media MCP server.
+"""Инструмент анализа видео через Gemini API.
 
-This tool analyzes videos by extracting frames and audio, then sending
-them together to Gemini API in a single multimodal request for comprehensive
-analysis combining visual and audio information.
+Функции:
+    analyze_video(video_path: str, prompt: str, ...) -> str
+        Анализирует видео с извлечением кадров и аудио.
 """
 
 import json
@@ -46,74 +46,45 @@ Provide your analysis in a structured format that separates visual, audio, and c
 def analyze_video(
     video_path: str,
     prompt: str = "Analyze this video content, describing what you see and hear.",
-    # Frame extraction modes
     frame_mode: Literal["fps", "total", "interval"] = "total",
     frame_count: Optional[int] = 10,
     fps: Optional[float] = None,
     interval_sec: Optional[float] = None,
-    # Frame quality
     max_dimension: int = 1920,
     image_format: Literal["webp", "jpeg"] = "webp",
     image_quality: int = 80,
-    # Audio options
     include_audio: bool = True,
     audio_bitrate: Literal[64, 32, 24] = 64,
-    # Utility
     dry_run: bool = False,
-    # Model selection
     model_name: str = DEFAULT_GEMINI_MODEL,
 ) -> str:
-    """Analyze video as frames + audio in one multimodal request.
+    """Анализирует видео как кадры + аудио в одном мультимодальном запросе.
 
-    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
-    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
-    For best results, provide prompts in ENGLISH.
-
-    Extracts video frames and audio track, optimizes them, and sends to Gemini API
-    for comprehensive analysis. Supports dry-run mode to estimate request size
-    before processing.
+    Извлекает кадры и аудиодорожку из видео, оптимизирует их и отправляет
+    в Gemini API для комплексного анализа.
 
     Args:
-        video_path: Absolute path to video file
-        prompt: Analysis request prompt (default: general analysis)
-        frame_mode: Frame extraction mode ('total', 'fps', 'interval')
-        frame_count: Number of frames for 'total' mode (default: 10)
-        fps: Frames per second for 'fps' mode (e.g., 0.5 = 1 frame every 2 sec)
-        interval_sec: Interval in seconds for 'interval' mode
-        max_dimension: Max dimension for frame resize (default: 1920 for 1080p)
-        image_format: Frame format ('webp' or 'jpeg', default: 'webp')
-        image_quality: Compression quality 1-100 (default: 80)
-        include_audio: Whether to extract and analyze audio (default: True)
-        audio_bitrate: Audio bitrate in kbps (64/32/24, default: 64)
-        dry_run: If True, only estimate size without processing (default: False)
-        model_name: Gemini model to use (default from config)
+        video_path: Абсолютный путь к видеофайлу.
+        prompt: Запрос на анализ.
+        frame_mode: Режим извлечения кадров ('total', 'fps', 'interval').
+        frame_count: Количество кадров для режима 'total'.
+        fps: Кадров в секунду для режима 'fps'.
+        interval_sec: Интервал в секундах для режима 'interval'.
+        max_dimension: Максимальное измерение для ресайза кадров.
+        image_format: Формат кадров ('webp' или 'jpeg').
+        image_quality: Качество сжатия (1-100).
+        include_audio: Извлекать ли аудиодорожку.
+        audio_bitrate: Битрейт аудио (64/32/24 kbps).
+        dry_run: Только оценить размер без обработки.
+        model_name: Модель Gemini для анализа.
 
     Returns:
-        JSON string with VideoAnalysisResponse or dry-run estimation
+        JSON-строка с VideoAnalysisResponse или оценкой размера.
 
     Raises:
-        FileNotFoundError: If video file not found
-        ValueError: If parameters invalid or request too large
-        RuntimeError: If analysis fails
-
-    Examples:
-        # Basic analysis with 30 frames
-        result = analyze_video("lecture.mp4", frame_count=30)
-
-        # Extract at 0.5 FPS (1 frame every 2 seconds)
-        result = analyze_video("video.mp4", frame_mode="fps", fps=0.5)
-
-        # Extract frame every 10 seconds, low audio bitrate
-        result = analyze_video(
-            "long_video.mp4",
-            frame_mode="interval",
-            interval_sec=10,
-            audio_bitrate=32
-        )
-
-        # Dry run to check size before processing
-        estimate = analyze_video("large.mp4", dry_run=True)
-        # Returns: {"estimated_size_mb": 18.5, "fits_in_limit": true, ...}
+        FileNotFoundError: Если видеофайл не найден.
+        ValueError: Неверные параметры или слишком большой запрос.
+        RuntimeError: Ошибка анализа.
     """
     logger.info("=" * 80)
     logger.info(f"🎬 VIDEO ANALYSIS STARTED: {video_path}")
@@ -270,10 +241,7 @@ def _estimate_request_size(
     include_audio: bool,
     audio_bitrate: int,
 ) -> str:
-    """Estimate request size without processing (dry-run mode).
-
-    Returns JSON with size estimation and recommendations.
-    """
+    """Оценивает размер запроса без обработки (dry-run режим)."""
     # Get audio metadata for duration
     from utils.audio_extractor import get_audio_metadata
 
@@ -369,17 +337,7 @@ def _build_multimodal_contents(
     image_format: str,
     audio_data: Optional[dict],
 ) -> list:
-    """Build multimodal contents array for Gemini API.
-
-    Args:
-        prompt: User prompt
-        frames_b64: List of base64-encoded frames
-        image_format: 'webp' or 'jpeg'
-        audio_data: Audio data dict with 'base64' and 'mime_type' (or None)
-
-    Returns:
-        List of content parts for Gemini API
-    """
+    """Строит массив мультимодального контента для Gemini API."""
     contents = []
 
     # Add text prompt first

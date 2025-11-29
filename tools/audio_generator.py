@@ -1,3 +1,14 @@
+"""Инструмент генерации аудио через Gemini TTS API.
+
+Функции:
+    save_wave_file(filename: str, pcm_data: bytes, ...) -> None
+        Сохраняет PCM данные в WAV файл.
+    get_audio_generation_guide() -> str
+        Возвращает руководство по генерации аудио.
+    generate_audio_from_yaml(yaml_path: str, model: str, output_path: str) -> str
+        Генерирует аудио из YAML-скрипта.
+"""
+
 import os
 import yaml
 import wave
@@ -27,7 +38,7 @@ def save_wave_file(
     rate: int = 24000,
     sample_width: int = 2,
 ) -> None:
-    """Saves PCM data to a WAV file."""
+    """Сохраняет PCM данные в WAV файл."""
     with wave.open(filename, "wb") as wf:
         wf.setnchannels(channels)
         wf.setsampwidth(sample_width)
@@ -36,7 +47,7 @@ def save_wave_file(
 
 
 def _load_yaml_script(yaml_path: str) -> Dict[str, Any]:
-    """Loads and validates the YAML script file."""
+    """Загружает и валидирует YAML-скрипт."""
     if not os.path.exists(yaml_path):
         raise FileNotFoundError(f"File not found at {yaml_path}")
 
@@ -52,7 +63,7 @@ def _load_yaml_script(yaml_path: str) -> Dict[str, Any]:
 
 
 def _resolve_voice_name(voice_input: str) -> str:
-    """Resolves voice name to the capitalized format required by API."""
+    """Разрешает имя голоса в формат, требуемый API."""
     voice_key = voice_input.lower()
     if voice_key in GEMINI_VOICES_DATA:
         return voice_key.capitalize()
@@ -66,7 +77,7 @@ def _resolve_voice_name(voice_input: str) -> str:
 def _prepare_speaker_config(
     cast: List[Dict[str, str]],
 ) -> Tuple[Dict[str, str], List[types.SpeakerVoiceConfig]]:
-    """Prepares speaker mapping and configuration objects."""
+    """Подготавливает конфигурацию спикеров."""
     speaker_map = {}
     speaker_configs = []
 
@@ -98,7 +109,7 @@ def _generate_content_request(
     speaker_configs: List[types.SpeakerVoiceConfig],
     is_multi_speaker: bool,
 ) -> Any:
-    """Sends the generation request to Gemini API."""
+    """Отправляет запрос на генерацию в Gemini API."""
 
     speech_config = (
         types.SpeechConfig(
@@ -121,9 +132,7 @@ def _generate_content_request(
 
 
 def get_audio_generation_guide() -> str:
-    """
-    Returns comprehensive guide for audio generation including voice catalog and YAML examples.
-    """
+    """Возвращает руководство по генерации аудио с каталогом голосов."""
     current_dir = os.path.dirname(os.path.abspath(__file__))
     base_dir = os.path.dirname(current_dir)
 
@@ -166,32 +175,15 @@ def get_audio_generation_guide() -> str:
 def generate_audio_from_yaml(
     yaml_path: str, model: str = DEFAULT_TTS_MODEL, output_path: Optional[str] = None
 ) -> str:
-    """
-    Generates audio from a local YAML script file using Gemini TTS.
-
-    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
-    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
-
-    ⚠️ TIER REQUIREMENTS & RATE LIMITS:
-    - **Free Tier**: 3 RPM (requests per minute) - Very limited! Use carefully.
-    - **Tier 1**: 10 RPM - Better for production use.
-
-    Both tiers support both TTS models, but Free tier's 3 RPM limit means you should:
-    - Batch multiple utterances into single YAML scripts
-    - Avoid frequent small requests
-    - Consider upgrading to Tier 1 for real-time or high-volume applications
-
-    To configure your tier, set GEMINI_TIER=tier1 in your .env file.
-    See https://ai.google.dev/pricing for tier details.
+    """Генерирует аудио из YAML-скрипта через Gemini TTS.
 
     Args:
-        yaml_path: Absolute path to the YAML file.
-        model: Gemini TTS model to use.
-               Default: 'gemini-2.5-flash-preview-tts' (faster, cheaper).
-               Alternative: 'gemini-2.5-pro-preview-tts' (higher quality, more expensive).
-               You must explicitly specify the Pro model if needed.
-        output_path: Absolute path where to save the output WAV file.
-                     If not provided, saves to output_audio/<script_name>.wav in project root.
+        yaml_path: Абсолютный путь к YAML-файлу.
+        model: Модель TTS (по умолчанию flash).
+        output_path: Путь для сохранения WAV-файла.
+
+    Returns:
+        Сообщение об успехе или ошибке.
     """
     try:
         # 0. Tier Validation (CRITICAL for Free tier: only 3 RPM!)

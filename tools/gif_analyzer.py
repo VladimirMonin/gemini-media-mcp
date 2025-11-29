@@ -1,4 +1,11 @@
-"""GIF animation analysis tool using Google Gemini API."""
+"""Инструмент анализа GIF-анимаций через Gemini API.
+
+Функции:
+    analyze_gif(image_path: str, prompt: str, ...) -> dict
+        Анализирует GIF-анимацию с извлечением ключевых кадров.
+    get_gif_guidelines() -> str
+        Возвращает руководство по анализу GIF.
+"""
 
 from typing import Literal, Optional
 from PIL import Image
@@ -32,85 +39,23 @@ async def analyze_gif(
     quality: Literal["uhd", "fhd", "hd", "balanced", "economy"] = DEFAULT_GIF_QUALITY,
     model: str = DEFAULT_GIF_MODEL,
 ) -> dict:
-    """Analyze GIF animation using Gemini AI.
+    """Анализирует GIF-анимацию через Gemini AI.
 
-    ⚠️ CRITICAL: This docstring is the PRIMARY source of truth for parameters.
-    If JSON Schema shows different parameter names, ALWAYS use what's documented here.
-    For best results, provide prompts in ENGLISH.
-
-    This tool extracts key frames from GIF animations and analyzes them as a cohesive sequence,
-    understanding both individual frames and the overall narrative/purpose of the animation.
+    Извлекает ключевые кадры из анимации и анализирует их как последовательность,
+    понимая как отдельные кадры, так и общий нарратив анимации.
 
     Args:
-        image_path: Path to GIF file (local path or URL)
-        prompt: Your specific question or analysis request. The default system prompt already
-                explains this is an animation, so add context like:
-                - "This is a VS Code tutorial showing..."
-                - "This demonstrates a chatbot conversation..."
-                - "This shows terminal commands..."
-        mode: Extraction strategy:
-              - 'total' (RECOMMENDED): Extract fixed number of evenly distributed frames
-              - 'fps': Extract frames at specified rate (frames per second)
-              - 'interval': Extract frames at fixed time intervals
-        gif_fps: Frames per second to extract (for 'fps' mode, e.g., 1.0 = 1 frame/sec)
-        frame_count: Number of frames to extract (for 'total' mode, default: 5)
-                    - 5 frames: Quick demos (10-30s)
-                    - 10 frames: Detailed tutorials (30-90s)
-                    - 15+ frames: Long sessions (2+ min)
-        interval_sec: Time interval in seconds (for 'interval' mode, e.g., 5.0 = every 5 sec)
-        quality: Image quality preset (default: 'fhd' for 1080p):
-                - 'fhd' (1920px): Best for UI tutorials with text (RECOMMENDED)
-                - 'hd' (1280px): Good balance for general animations
-                - 'balanced' (960px): Budget-friendly for long sessions
-                - 'economy' (768px): Minimal quality, lowest cost
-                - 'uhd' (original): Maximum detail, highest cost
-        model: Gemini model to use (default: 'gemini-2.5-flash')
+        image_path: Путь к GIF-файлу.
+        prompt: Запрос на анализ.
+        mode: Стратегия извлечения кадров ('total', 'fps', 'interval').
+        gif_fps: Кадров в секунду для режима 'fps'.
+        frame_count: Количество кадров для режима 'total'.
+        interval_sec: Интервал в секундах для режима 'interval'.
+        quality: Пресет качества ('uhd', 'fhd', 'hd', 'balanced', 'economy').
+        model: Модель Gemini для анализа.
 
     Returns:
-        dict: {
-            "analysis": str,           # AI analysis of the animation
-            "metadata": {
-                "frame_count": int,    # Number of frames analyzed
-                "mode": str,           # Extraction mode used
-                "quality": str,        # Quality preset used
-                "estimated_tokens": int, # Approximate token usage
-                "model": str,          # Model used
-                "extraction_params": dict
-            }
-        }
-
-    Examples:
-        # Quick UI tutorial analysis (RECOMMENDED)
-        result = await analyze_gif(
-            "tutorial.gif",
-            prompt="This is a VS Code feature demo. Describe each step.",
-            frame_count=5,
-            quality='fhd'
-        )
-
-        # Detailed workflow analysis
-        result = await analyze_gif(
-            "workflow.gif",
-            prompt="Explain this design process",
-            frame_count=10,
-            quality='fhd'
-        )
-
-        # Budget-friendly long session
-        result = await analyze_gif(
-            "long_session.gif",
-            prompt="Summarize this terminal session",
-            frame_count=10,
-            quality='balanced'
-        )
-
-        # FPS mode for time-sensitive analysis
-        result = await analyze_gif(
-            "animation.gif",
-            mode='fps',
-            gif_fps=1.0,
-            quality='hd'
-        )
+        Словарь с результатами анализа и метаданными.
     """
     try:
         logger.info("=" * 80)
@@ -224,12 +169,5 @@ async def analyze_gif(
 
 
 async def get_gif_guidelines() -> str:
-    """Get comprehensive guidelines for GIF animation analysis.
-
-    Returns best practices, quality recommendations, cost estimates,
-    and example workflows for analyzing GIF animations.
-
-    Returns:
-        str: Formatted guidelines text
-    """
+    """Возвращает руководство по анализу GIF-анимаций."""
     return GIF_USER_GUIDELINES

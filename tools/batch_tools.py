@@ -1,14 +1,14 @@
-"""Batch and queue MCP tools for async task management.
+"""Инструменты MCP для асинхронного управления задачами.
 
-This module provides MCP tools for:
-- batch_generate_images: Create batch of image generation tasks
-- queue_generate_audio: Create TTS task in local queue
-- check_task_status: Check status of a single task
-- check_batch_progress: Check progress of a batch
-
-All constants (voices, aspect ratios, models) are imported from config.py.
-Server is "dumb" - only validates and writes to DB.
-Worker is "smart" - determines paths, calls APIs.
+Функции:
+    batch_generate_images(prompts: List[str], ...) -> dict
+        Создаёт пакет задач генерации изображений.
+    queue_generate_audio(text: str, voice: str, ...) -> dict
+        Создаёт задачу TTS в очереди.
+    check_task_status(task_id: str) -> dict
+        Проверяет статус отдельной задачи.
+    check_batch_progress(batch_id: str) -> dict
+        Проверяет прогресс пакета задач.
 """
 
 import json
@@ -29,16 +29,9 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Получаем singleton instance базы данных
 db = DatabaseManager()
 
-# Извлекаем список валидных голосов из конфига (ключи словаря)
 VALID_VOICES = list(GEMINI_VOICES_DATA.keys())
-
-
-# ============================================================================
-# Tool 1: batch_generate_images
-# ============================================================================
 
 
 def batch_generate_images(
@@ -47,54 +40,19 @@ def batch_generate_images(
     resolution: str = "1K",
     model_type: Literal["fast", "pro"] = "fast",
 ) -> dict:
-    """
-    Create a batch of image generation tasks for async processing.
-
-    This tool creates multiple image generation tasks that will be processed
-    by Google Batch API. Use this when you need to generate 2+ images.
-
-    **Cost savings:** 50% cheaper than sync generation.
-    **Processing time:** 2-5 minutes (async).
+    """Создаёт пакет задач генерации изображений.
 
     Args:
-        prompts: List of English prompts for image generation (2-100 items).
-                 Each prompt should be detailed and descriptive.
-        aspect_ratio: Image aspect ratio. Valid values:
-                     '1:1', '3:4', '4:3', '9:16', '16:9',
-                     '2:3', '3:2', '4:5', '5:4', '21:9'.
-                     Default: '1:1'.
-        resolution: Output resolution: '1K' or '2K'.
-                   Note: '2K' only works with model_type='pro'.
-                   Default: '1K'.
-        model_type: Generation model:
-                   - 'fast': Gemini 2.5 Flash (quick, cheaper)
-                   - 'pro': Gemini 3 Pro (higher quality, 2K support)
-                   Default: 'fast'.
+        prompts: Список промптов для генерации (2-100 элементов).
+        aspect_ratio: Соотношение сторон.
+        resolution: Разрешение ('1K' или '2K').
+        model_type: Тип модели ('fast' или 'pro').
 
     Returns:
-        dict: {
-            "batch_id": "uuid",
-            "total_tasks": 10,
-            "status": "PENDING",
-            "estimated_cost": "$0.025",
-            "estimated_time": "2-5 minutes",
-            "message": "Batch created. Use check_batch_progress(batch_id) to track."
-        }
+        Словарь с batch_id и статусом.
 
     Raises:
-        ValueError: If prompts count is invalid (must be 2-100).
-        ValueError: If aspect_ratio is not in valid list.
-        ValueError: If resolution is invalid.
-        ValueError: If model_type is invalid.
-
-    Example:
-        >>> result = await batch_generate_images(
-        ...     prompts=["A red sports car", "A blue motorcycle"],
-        ...     aspect_ratio="16:9",
-        ...     model_type="fast"
-        ... )
-        >>> print(result["batch_id"])
-        "550e8400-e29b-41d4-a716-446655440000"
+        ValueError: Неверное количество промптов или параметры.
     """
     # --- 1. Validation ---
     if not prompts or not (2 <= len(prompts) <= 100):
@@ -176,59 +134,23 @@ def batch_generate_images(
     }
 
 
-# ============================================================================
-# Tool 2: queue_generate_audio
-# ============================================================================
-
-
 def queue_generate_audio(
     text: str,
     voice: str = "puck",
     model_type: Literal["flash", "pro"] = "flash",
 ) -> dict:
-    """
-    Create a TTS (Text-to-Speech) task for async audio generation.
-
-    This tool creates a single TTS task that will be processed by the
-    local queue worker with rate limiting (respects API limits).
-
-    **Processing time:** 5-10 seconds (includes rate limiting delay).
+    """Создаёт задачу TTS для асинхронной генерации аудио.
 
     Args:
-        text: Text to synthesize (max 5000 characters).
-              Should be clean text without special formatting.
-        voice: Voice name for synthesis. Valid voices include:
-               'puck' (Male, clear), 'kore' (Female, energetic),
-               'charon' (Male, smooth), 'aoede' (Female, conversational),
-               'fenrir' (Male, friendly), and many more.
-               Default: 'puck'.
-        model_type: TTS model:
-                   - 'flash': Faster, cheaper (gemini-2.5-flash-preview-tts)
-                   - 'pro': Higher quality (gemini-2.5-pro-preview-tts)
-                   Default: 'flash'.
+        text: Текст для синтеза (максимум 5000 символов).
+        voice: Имя голоса для синтеза.
+        model_type: Тип модели TTS ('flash' или 'pro').
 
     Returns:
-        dict: {
-            "task_id": "uuid",
-            "status": "PENDING",
-            "estimated_cost": "$0.01",
-            "estimated_time": "5-10 seconds",
-            "message": "Task created. Use check_task_status(task_id) to track."
-        }
+        Словарь с task_id и статусом.
 
     Raises:
-        ValueError: If text is too long (>5000 characters).
-        ValueError: If voice is not in valid list.
-        ValueError: If model_type is invalid.
-
-    Example:
-        >>> result = await queue_generate_audio(
-        ...     text="Hello, world! This is a test.",
-        ...     voice="puck",
-        ...     model_type="flash"
-        ... )
-        >>> print(result["task_id"])
-        "550e8400-e29b-41d4-a716-446655440000"
+        ValueError: Текст слишком длинный или неверные параметры.
     """
     # --- 1. Validation ---
     if not text or not text.strip():
@@ -307,40 +229,17 @@ def queue_generate_audio(
     }
 
 
-# ============================================================================
-# Tool 3: check_task_status
-# ============================================================================
-
-
 def check_task_status(task_id: str) -> dict:
-    """
-    Check the status of a single task.
-
-    Use this tool to track progress of tasks created by:
-    - queue_generate_audio (TTS tasks)
-    - Individual tasks from batch_generate_images
+    """Проверяет статус отдельной задачи.
 
     Args:
-        task_id: Task UUID returned by queue_generate_audio or from batch tasks.
+        task_id: UUID задачи.
 
     Returns:
-        dict: {
-            "task_id": "uuid",
-            "operation_type": "TTS_GEN_QUEUE",
-            "status": "COMPLETED",  # PENDING, PROCESSING, COMPLETED, FAILED
-            "local_path": "/absolute/path/to/file.wav",  # If COMPLETED
-            "error": "Error message",  # If FAILED
-            "created_at": "2025-11-27 10:00:00",
-            "completed_at": "2025-11-27 10:00:05"  # If COMPLETED
-        }
+        Словарь со статусом задачи.
 
     Raises:
-        ValueError: If task_id is not found.
-
-    Example:
-        >>> result = await check_task_status("550e8400-e29b-41d4-a716-446655440000")
-        >>> if result["status"] == "COMPLETED":
-        ...     print(f"File saved at: {result['local_path']}")
+        ValueError: Если задача не найдена.
     """
     # --- 1. Get task from DB ---
     task = db.get_task(task_id)
@@ -372,44 +271,17 @@ def check_task_status(task_id: str) -> dict:
     return response
 
 
-# ============================================================================
-# Tool 4: check_batch_progress
-# ============================================================================
-
-
 def check_batch_progress(batch_id: str) -> dict:
-    """
-    Check the progress of a batch of tasks.
-
-    Use this tool to track progress of batches created by batch_generate_images.
+    """Проверяет прогресс пакета задач.
 
     Args:
-        batch_id: Batch UUID returned by batch_generate_images.
+        batch_id: UUID пакета.
 
     Returns:
-        dict: {
-            "batch_id": "uuid",
-            "operation_type": "IMG_GEN_BATCH",
-            "status": "PROCESSING",  # PENDING, SUBMITTED, PROCESSING, COMPLETED, FAILED
-            "total_tasks": 10,
-            "completed_tasks": 3,
-            "failed_tasks": 0,
-            "pending_tasks": 7,
-            "progress_percent": 30,
-            "google_batch_id": "batches/abc123",  # If submitted to Google
-            "created_at": "2025-11-27 10:00:00",
-            "completed_at": "2025-11-27 10:05:00",  # If completed
-            "message": "Batch is being processed by Google Batch API"
-        }
+        Словарь с прогрессом пакета.
 
     Raises:
-        ValueError: If batch_id is not found.
-
-    Example:
-        >>> result = await check_batch_progress("550e8400-e29b-41d4-a716-446655440000")
-        >>> print(f"Progress: {result['progress_percent']}%")
-        >>> if result["status"] == "COMPLETED":
-        ...     print("All images generated!")
+        ValueError: Если пакет не найден.
     """
     # --- 1. Get batch from DB ---
     batch = db.get_batch(batch_id)
