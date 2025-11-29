@@ -1,8 +1,12 @@
-"""Audio extraction and conversion utilities for video analysis.
+"""Утилиты извлечения и конвертации аудио из видео.
 
-This module provides functionality to extract audio tracks from video files
-and convert them to optimized Vorbis mono format with configurable bitrates.
-All processing is done in-memory without creating temporary files.
+Функции:
+    estimate_audio_size(duration_sec: float, bitrate: int) -> float
+        Оценивает размер аудиофайла без обработки.
+    extract_audio_from_video(video_path: str, ...) -> dict
+        Извлекает и конвертирует аудиодорожку из видео.
+    get_audio_metadata(video_path: str) -> dict
+        Получает метаданные аудио без полного извлечения.
 """
 
 import base64
@@ -16,22 +20,14 @@ logger = get_logger(__name__)
 
 
 def estimate_audio_size(duration_sec: float, bitrate: int = 64) -> float:
-    """Calculate estimated audio file size without processing.
+    """Оценивает размер аудиофайла без обработки.
 
     Args:
-        duration_sec: Audio duration in seconds
-        bitrate: Bitrate in kbps (default: 64)
+        duration_sec: Длительность аудио в секундах.
+        bitrate: Битрейт в kbps.
 
     Returns:
-        Estimated size in MB
-
-    Examples:
-        >>> estimate_audio_size(600, 64)  # 10 minutes at 64 kbps
-        4.8
-        >>> estimate_audio_size(1800, 32)  # 30 minutes at 32 kbps
-        7.2
-        >>> estimate_audio_size(1800, 24)  # 30 minutes at 24 kbps
-        5.4
+        Ожидаемый размер в МБ.
     """
     # Formula: (duration_sec * bitrate_kbps * 1000 bits/kbit) / 8 bits/byte
     size_bytes = (duration_sec * bitrate * 1000) / 8
@@ -45,43 +41,20 @@ def extract_audio_from_video(
     max_duration_sec: Optional[int] = None,
     dry_run: bool = False,
 ) -> dict:
-    """Extract and convert audio track from video file.
-
-    Extracts audio in-memory and converts to mono Vorbis (OGG) format
-    for optimal compression and Gemini API compatibility.
+    """Извлекает и конвертирует аудиодорожку из видео.
 
     Args:
-        video_path: Path to video file
-        bitrate: Output bitrate in kbps (64/32/24, default: 64)
-        max_duration_sec: Maximum duration to extract (None = full audio)
-        dry_run: If True, only calculate size without processing
+        video_path: Путь к видеофайлу.
+        bitrate: Битрейт в kbps (64/32/24).
+        max_duration_sec: Максимальная длительность для извлечения.
+        dry_run: Если True, только оценивает размер.
 
     Returns:
-        Dictionary with audio data:
-        {
-            'base64': str,           # Only if dry_run=False
-            'mime_type': 'audio/ogg',
-            'duration_sec': float,
-            'size_mb': float,
-            'bitrate': int,
-            'channels': 1  # mono
-        }
+        Словарь с данными аудио.
 
     Raises:
-        FileNotFoundError: If video file not found
-        RuntimeError: If audio extraction fails
-
-    Examples:
-        # Extract full audio at 64 kbps
-        audio = extract_audio_from_video("video.mp4", bitrate=64)
-        print(f"Size: {audio['size_mb']:.2f} MB")
-
-        # Extract first 5 minutes at 32 kbps
-        audio = extract_audio_from_video("lecture.mp4", bitrate=32, max_duration_sec=300)
-
-        # Dry run to estimate size
-        audio = extract_audio_from_video("long.mp4", dry_run=True)
-        print(f"Estimated: {audio['size_mb']:.2f} MB")
+        FileNotFoundError: Если видеофайл не найден.
+        RuntimeError: Ошибка извлечения аудио.
     """
     if not os.path.exists(video_path):
         logger.error(f"Video file not found: {video_path}")
@@ -166,24 +139,16 @@ def extract_audio_from_video(
 
 
 def get_audio_metadata(video_path: str) -> dict:
-    """Get audio metadata without extracting full audio.
-
-    Fast metadata retrieval for planning purposes.
+    """Получает метаданные аудио без полного извлечения.
 
     Args:
-        video_path: Path to video file
+        video_path: Путь к видеофайлу.
 
     Returns:
-        Dictionary with metadata:
-        {
-            'duration_sec': float,
-            'channels': int,
-            'sample_rate': int,
-            'has_audio': bool
-        }
+        Словарь с метаданными.
 
     Raises:
-        FileNotFoundError: If video file not found
+        FileNotFoundError: Если видеофайл не найден.
     """
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")

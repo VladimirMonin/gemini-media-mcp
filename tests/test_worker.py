@@ -1,11 +1,10 @@
-"""
-Тесты для WorkerManager — фоновый обработчик очереди задач.
+"""Тесты для WorkerManager — фоновый обработчик очереди задач.
 
-Проверяет:
-- Старт/стоп воркера
-- Health Check восстановление зависших задач
-- Обработка local_queue задач
-- Graceful shutdown
+Классы:
+    TestWorkerLifecycle — тесты жизненного цикла воркера.
+    TestHealthCheck — тесты восстановления зависших задач.
+    TestLocalQueueProcessing — тесты обработки local_queue задач.
+    TestGracefulShutdown — тесты корректного завершения.
 """
 
 import pytest
@@ -24,7 +23,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 @pytest.fixture
 def temp_db(tmp_path):
-    """Временная БД для тестов."""
+    """Создаёт временную БД для тестов."""
     db_path = tmp_path / "test_worker.db"
     db = DatabaseManager()
     db.initialize(str(db_path))
@@ -36,7 +35,7 @@ class TestWorkerLifecycle:
     """Тесты жизненного цикла воркера."""
 
     def test_worker_start_stop(self, temp_db):
-        """Воркер запускается и корректно останавливается."""
+        """Проверяет запуск и корректную остановку воркера."""
         worker = WorkerManager(temp_db, tick_interval=1)
 
         # Запуск
@@ -52,7 +51,7 @@ class TestWorkerLifecycle:
         assert not worker._thread.is_alive()
 
     def test_worker_already_running(self, temp_db):
-        """Повторный start() игнорируется, если воркер уже запущен."""
+        """Проверяет, что повторный start() игнорируется."""
         worker = WorkerManager(temp_db, tick_interval=1)
 
         worker.start()
@@ -68,7 +67,7 @@ class TestWorkerLifecycle:
         worker.stop(timeout=5)
 
     def test_worker_stop_not_running(self, temp_db):
-        """stop() без запущенного воркера не падает."""
+        """Проверяет, что stop() без запущенного воркера не падает."""
         worker = WorkerManager(temp_db, tick_interval=1)
 
         # Остановка без старта
@@ -77,10 +76,10 @@ class TestWorkerLifecycle:
 
 
 class TestHealthCheck:
-    """Тесты Health Check восстановления зависших задач."""
+    """Тесты восстановления зависших задач."""
 
     def test_health_check_recovers_stale_tasks(self, temp_db):
-        """Health Check находит и восстанавливает зависшие задачи."""
+        """Проверяет, что Health Check находит и восстанавливает зависшие задачи."""
         # Создать задачу в статусе PROCESSING со старым updated_at
         batch_id = str(uuid4())
         task_id = str(uuid4())
@@ -126,10 +125,7 @@ class TestLocalQueueProcessing:
     def test_local_queue_processes_one_task(
         self, mock_genai, temp_db, tmp_path, monkeypatch
     ):
-        """Воркер обрабатывает 1 TTS задачу за цикл (с моком API).
-
-        Note: Тест медленный (~15 сек) из-за rate limiting sleep.
-        """
+        """Проверяет обработку 1 TTS задачи за цикл (с моком API)."""
         import config
 
         # Подменить OUTPUT_TTS_DIR на tmp_path
@@ -185,7 +181,7 @@ class TestLocalQueueProcessing:
         assert task["local_path"] is not None
 
     def test_local_queue_ignores_batch_tasks(self, temp_db):
-        """Воркер не обрабатывает batch задачи в local_queue процессоре."""
+        """Проверяет, что воркер не обрабатывает batch задачи в local_queue."""
         batch_id = str(uuid4())
         task_id = str(uuid4())
 
@@ -246,7 +242,7 @@ class TestGracefulShutdown:
     """Тесты корректного завершения воркера."""
 
     def test_worker_graceful_shutdown(self, temp_db):
-        """Воркер завершается корректно, не оставляя зомби-потоков."""
+        """Проверяет корректное завершение без зомби-потоков."""
         worker = WorkerManager(temp_db, tick_interval=10)
 
         worker.start()
@@ -260,7 +256,7 @@ class TestGracefulShutdown:
         assert not worker._thread.is_alive()
 
     def test_worker_stop_event_interrupts_sleep(self, temp_db):
-        """stop_event.wait() прерывается немедленно, не ждёт tick_interval."""
+        """Проверяет, что stop_event.wait() прерывается немедленно."""
         worker = WorkerManager(temp_db, tick_interval=30)  # Длинный интервал
 
         worker.start()

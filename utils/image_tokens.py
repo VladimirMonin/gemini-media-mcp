@@ -1,7 +1,12 @@
-"""Token calculation utilities for Gemini API media processing.
+"""Утилиты расчёта токенов для обработки медиа Gemini API.
 
-Based on official Gemini documentation:
-https://ai.google.dev/gemini-api/docs/image-understanding#token-calculation
+Функции:
+    calculate_image_tokens(image: Image.Image) -> int
+        Рассчитывает количество токенов для изображения.
+    calculate_images_tokens(images: List[Image.Image]) -> dict
+        Рассчитывает общее количество токенов для списка изображений.
+    estimate_cost(tokens: int, model: str) -> dict
+        Оценивает стоимость API на основе количества токенов.
 """
 
 from typing import List
@@ -12,30 +17,13 @@ logger = get_logger(__name__)
 
 
 def calculate_image_tokens(image: Image.Image) -> int:
-    """Calculate token count for a single image.
-
-    Token calculation logic based on Gemini documentation:
-    - Images ≤384px (both dimensions): 258 tokens
-    - Larger images: Tiled at 768×768px, each tile = 258 tokens
-
-    Formula for tiles:
-    1. crop_unit = floor(min(width, height) / 1.5)
-    2. tiles = (width / crop_unit) × (height / crop_unit)
+    """Рассчитывает количество токенов для изображения.
 
     Args:
-        image: PIL Image object
+        image: PIL Image объект.
 
     Returns:
-        Estimated token count for this image
-
-    Examples:
-        >>> img = Image.open("small.jpg")  # 300×200
-        >>> calculate_image_tokens(img)
-        258
-
-        >>> img = Image.open("large.jpg")  # 960×540
-        >>> calculate_image_tokens(img)  # crop_unit=360, tiles=3×2=6
-        1548  # 6 × 258
+        Ожидаемое количество токенов.
     """
     width, height = image.size
 
@@ -63,28 +51,13 @@ def calculate_image_tokens(image: Image.Image) -> int:
 
 
 def calculate_images_tokens(images: List[Image.Image]) -> dict:
-    """Calculate total tokens for multiple images.
+    """Рассчитывает общее количество токенов для списка изображений.
 
     Args:
-        images: List of PIL Image objects
+        images: Список PIL Image объектов.
 
     Returns:
-        dict with breakdown:
-        {
-            'total_tokens': int,
-            'image_count': int,
-            'per_image': [int, ...],
-            'breakdown': str
-        }
-
-    Example:
-        >>> images = [img1, img2, img3]
-        >>> result = calculate_images_tokens(images)
-        >>> print(result['breakdown'])
-        Image 1 (1920×1080): 1,548 tokens
-        Image 2 (800×600): 258 tokens
-        Image 3 (3840×2160): 6,192 tokens
-        Total: 7,998 tokens
+        Словарь с разбивкой по изображениям.
     """
     per_image_tokens = [calculate_image_tokens(img) for img in images]
     total = sum(per_image_tokens)
@@ -98,7 +71,7 @@ def calculate_images_tokens(images: List[Image.Image]) -> dict:
     breakdown_lines.append(f"Total: {total:,} tokens")
     breakdown = "\n".join(breakdown_lines)
 
-    logger.info(f"Calculated tokens for {len(images)} images: {total:,} total")
+    logger.info(f"💰 Рассчитаны токены для {len(images)} изображений: {total:,}")
 
     return {
         "total_tokens": total,
@@ -109,27 +82,14 @@ def calculate_images_tokens(images: List[Image.Image]) -> dict:
 
 
 def estimate_cost(tokens: int, model: str = "gemini-2.5-flash") -> dict:
-    """Estimate API cost based on token count.
-
-    Pricing as of 2025 (check current rates at https://ai.google.dev/pricing):
-    - Flash models: Lower cost per token
-    - Pro models: Higher cost per token
+    """Оценивает стоимость API на основе количества токенов.
 
     Args:
-        tokens: Total token count
-        model: Model name
+        tokens: Общее количество токенов.
+        model: Название модели.
 
     Returns:
-        dict with cost estimates
-
-    Example:
-        >>> estimate_cost(7500, "gemini-2.5-flash")
-        {
-            'tokens': 7500,
-            'model': 'gemini-2.5-flash',
-            'estimated_input_cost_usd': 0.000141,
-            'note': 'Output tokens charged separately...'
-        }
+        Словарь с оценкой стоимости.
     """
     # Pricing tiers (example - update with actual rates)
     # Free tier: 1,500 requests per day, 1 million tokens per minute

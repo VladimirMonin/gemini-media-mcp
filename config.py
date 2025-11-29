@@ -1,7 +1,18 @@
-"""Configuration module for Gemini Media MCP server.
+"""Конфигурация Gemini Media MCP сервера.
 
-This module loads environment variables and defines default prompts
-and model configurations for the image analysis service.
+Функции:
+    get_api_key() -> str
+        Получает API-ключ Gemini из переменных окружения.
+    get_tier() -> str
+        Получает tier пользователя из переменных окружения.
+    get_batch_model(operation_type: str, input_payload: dict) -> str
+        Возвращает имя модели для Batch API по типу операции.
+    is_feature_available(feature: str) -> bool
+        Проверяет доступность функции на текущем tier.
+    get_rate_limit(model_name: str, limit_type: str) -> int
+        Получает лимит запросов для конкретной модели.
+    validate_model_for_tier(model_name: str, feature_type: str) -> tuple[bool, str]
+        Проверяет доступность модели на текущем tier.
 """
 
 import os
@@ -70,39 +81,29 @@ def get_tier() -> str:
 
 GEMINI_TIER = get_tier()
 
-# Rate limits на основе tier (ТОЧНЫЕ данные из официальной документации Google AI)
-# RPM - Requests Per Minute
-# TPM - Tokens Per Minute
-# RPD - Requests Per Day
 TIER_RATE_LIMITS = {
     "free": {
-        # Модели для анализа контента (image/audio/video/gif)
         "text_models": {
             "gemini-2.5-pro": {"rpm": 2, "tpm": 125000, "rpd": 50},
             "gemini-2.5-flash": {"rpm": 10, "tpm": 250000, "rpd": 250},
             "gemini-2.5-flash-lite": {"rpm": 15, "tpm": 250000, "rpd": 1000},
         },
-        # Генерация аудио - всего 3 запроса в минуту на Free tier!
         "audio_generation": {
             "gemini-2.5-flash-preview-tts": {"rpm": 3, "tpm": 10000, "rpd": 15}
         },
-        # Генерация изображений НЕДОСТУПНА на Free tier
         "image_generation_available": False,
     },
     "tier1": {
-        # Модели для анализа контента + доступ к Gemini 3 Pro
         "text_models": {
             "gemini-3-pro-preview": {"rpm": 50, "tpm": 1000000, "rpd": 1000},
             "gemini-2.5-pro": {"rpm": 150, "tpm": 2000000, "rpd": 10000},
             "gemini-2.5-flash": {"rpm": 1000, "tpm": 1000000, "rpd": 10000},
             "gemini-2.5-flash-lite": {"rpm": 4000, "tpm": 4000000, "rpd": None},
         },
-        # Генерация аудио - 2 модели доступны на Tier1
         "audio_generation": {
             "gemini-2.5-flash-preview-tts": {"rpm": 10, "tpm": 10000, "rpd": 100},
             "gemini-2.5-pro-preview-tts": {"rpm": 10, "tpm": 10000, "rpd": 50},
         },
-        # Генерация изображений ДОСТУПНА на Tier1
         "image_generation_available": True,
         "image_models": {
             "gemini-2.5-flash-image": {"rpm": 500, "tpm": 500000, "rpd": 2000},
@@ -112,22 +113,9 @@ TIER_RATE_LIMITS = {
 }
 
 
-# ============================================================================
-# Batch API Model Mapping (Фаза 3)
-# ============================================================================
-# Маппинг типов операций на модели Google Gemini для Batch API.
-# Всего ДВА типа моделей: "Кисть" (генерация) и "Мозг" (анализ).
-#
-# ВАЖНО: Для IMG_GEN_BATCH используется IMAGE_GEN_MODELS (fast/pro выбор).
-# Модель выбирается динамически из input_payload задачи (model_type: "fast"/"pro").
-
+# Маппинг типов операций на модели Gemini для Batch API
 BATCH_MODEL_MAPPING = {
-    # Группа "Генерация изображений" — динамический выбор fast/pro
-    # Ссылка на IMAGE_GEN_MODELS = {"fast": "gemini-2.5-flash-image", "pro": "gemini-3-pro-image-preview"}
-    # get_batch_model() достанет model_type из input_payload и вернёт нужную модель
-    "IMG_GEN_BATCH": "__use_image_gen_models__",  # Специальный маркер для динамического выбора
-    # Группа "Анализ и Текст" — универсальная мультимодальная модель
-    # (одна модель для всех типов контента: изображения, видео, текст)
+    "IMG_GEN_BATCH": "__use_image_gen_models__",
     "IMG_ANALYZE_BATCH": "gemini-2.5-flash",
     "VIDEO_ANALYZE_BATCH": "gemini-2.5-flash",
     "GIF_ANALYZE_BATCH": "gemini-2.5-flash",
@@ -328,8 +316,6 @@ AVAILABLE_IMAGE_ANALYSIS_PROMPTS = {
     "technical": TECHNICAL_IMAGE_ANALYSIS_SYSTEM_PROMPT,
 }
 
-# --- Audio Analysis Configuration ---
-
 SUPPORTED_AUDIO_FORMATS = {
     "audio/mpeg": "MP3",
     "audio/mp3": "MP3",
@@ -346,8 +332,6 @@ SUPPORTED_AUDIO_FORMATS = {
 }
 
 MAX_FILE_SIZE_MB = 19.5
-
-# --- Audio Analysis Prompts ---
 
 DEFAULT_AUDIO_ANALYSIS_SYSTEM_PROMPT: str = """
 You are an expert audio analyst. Analyze the provided audio file and generate a structured JSON response based on the following schema.
@@ -376,18 +360,13 @@ AVAILABLE_AUDIO_ANALYSIS_PROMPTS = {
     "default": DEFAULT_AUDIO_ANALYSIS_SYSTEM_PROMPT,
 }
 
-# --- Audio Generation Configuration ---
-
-# Get project root directory (where config.py is located)
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-# Output directories (old and new structure)
-OUTPUT_AUDIO_DIR = os.path.join(_PROJECT_ROOT, "output_audio")  # Legacy location
+OUTPUT_AUDIO_DIR = os.path.join(_PROJECT_ROOT, "output_audio")
 OUTPUT_DIR = os.path.join(_PROJECT_ROOT, "output")
 OUTPUT_IMAGES_DIR = os.path.join(OUTPUT_DIR, "images")
 OUTPUT_AUDIO_DIR_NEW = os.path.join(OUTPUT_DIR, "audio")
 
-# Create backup directories
 os.makedirs(OUTPUT_IMAGES_DIR, exist_ok=True)
 os.makedirs(OUTPUT_AUDIO_DIR_NEW, exist_ok=True)
 
@@ -493,19 +472,16 @@ GEMINI_VOICES_DATA = {
 
 DEFAULT_VOICE = "Kore"
 
-
-# --- GIF Animation Analysis Configuration ---
-
 GIF_QUALITY_PRESETS = {
-    "uhd": None,  # Без ресайза (3840×2160) - максимум деталей
-    "fhd": 1920,  # Full HD - текст 12pt+ читается отлично (DEFAULT)
-    "hd": 1280,  # HD - текст 14pt+ читается хорошо
-    "balanced": 960,  # Баланс - крупный текст читается
-    "economy": 768,  # Экономия - только крупный текст
+    "uhd": None,
+    "fhd": 1920,
+    "hd": 1280,
+    "balanced": 960,
+    "economy": 768,
 }
 
-DEFAULT_GIF_QUALITY = "fhd"  # 1080p по умолчанию
-DEFAULT_GIF_MODEL = "gemini-2.5-flash"  # Flash 2.5 по умолчанию
+DEFAULT_GIF_QUALITY = "fhd"
+DEFAULT_GIF_MODEL = "gemini-2.5-flash"
 
 DEFAULT_GIF_ANALYSIS_SYSTEM_PROMPT: str = """
 You are analyzing an animated sequence extracted from a GIF file.
@@ -596,22 +572,17 @@ quality: 'balanced'
 ```
 """
 
-
-# --- Video Analysis Configuration ---
-
-# Video quality presets (max_dimension values)
 VIDEO_QUALITY_PRESETS = {
-    "uhd": 3840,  # 4K UHD
-    "fhd": 1920,  # 1080p Full HD (default)
-    "hd": 1280,  # 720p HD
-    "sd": 720,  # SD quality
-    "economy": 480,  # Low quality for economy
+    "uhd": 3840,
+    "fhd": 1920,
+    "hd": 1280,
+    "sd": 720,
+    "economy": 480,
 }
 
-DEFAULT_VIDEO_QUALITY = "fhd"  # 1080p по умолчанию
-DEFAULT_VIDEO_MODEL = "gemini-2.5-flash"  # Flash 2.5 по умолчанию
+DEFAULT_VIDEO_QUALITY = "fhd"
+DEFAULT_VIDEO_MODEL = "gemini-2.5-flash"
 
-# Supported video formats (common video containers)
 SUPPORTED_VIDEO_FORMATS = {
     "video/mp4": "MP4",
     "video/mpeg": "MPEG",
@@ -621,23 +592,13 @@ SUPPORTED_VIDEO_FORMATS = {
     "video/webm": "WEBM",
 }
 
-# Audio bitrate presets for video (kbps)
 VIDEO_AUDIO_BITRATES = {
-    "high": 64,  # Best quality for speech + music
-    "medium": 32,  # Good for speech (default)
-    "low": 24,  # Acceptable for speech only
+    "high": 64,
+    "medium": 32,
+    "low": 24,
 }
 
-DEFAULT_VIDEO_AUDIO_BITRATE = 64  # kbps
-
-
-# --- Image Generation Configuration ---
-
-# config.py
-
-# ... (предыдущий код get_api_key и т.д. остается без изменений) ...
-
-# --- Image Generation Configuration ---
+DEFAULT_VIDEO_AUDIO_BITRATE = 64
 
 IMAGE_GEN_MODELS = {
     "fast": "gemini-2.5-flash-image",
@@ -646,8 +607,6 @@ IMAGE_GEN_MODELS = {
 
 DEFAULT_IMAGE_GEN_MODEL = "fast"
 
-# --- TTS (Text-to-Speech) Generation Configuration ---
-
 TTS_MODELS = {
     "flash": "gemini-2.5-flash-preview-tts",
     "pro": "gemini-2.5-pro-preview-tts",
@@ -655,12 +614,9 @@ TTS_MODELS = {
 
 DEFAULT_TTS_MODEL = "flash"
 
-# Путь для сохранения TTS аудио (структура media/tts/{task_id}.wav)
 OUTPUT_TTS_DIR = os.path.join(_PROJECT_ROOT, "media", "tts")
 os.makedirs(OUTPUT_TTS_DIR, exist_ok=True)
 
-# Flash поддерживает только 1:1, 16:9, 9:16, 4:3, 3:4 (базовые).
-# Pro поддерживает весь спектр.
 VALID_ASPECT_RATIOS = [
     "1:1",
     "3:4",

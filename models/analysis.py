@@ -1,7 +1,14 @@
-"""Pydantic models for structured image analysis responses.
+"""Модели данных для структурированных ответов анализа.
 
-This module defines the data models used for image analysis responses
-and error handling in the Gemini Media MCP server.
+Классы:
+    ImageAnalysisResponse
+        Структурированный ответ анализа изображения.
+    ErrorResponse
+        Структурированный ответ с ошибкой.
+    AudioAnalysisResponse
+        Структурированный ответ анализа аудио.
+    VideoAnalysisResponse
+        Структурированный ответ анализа видео.
 """
 
 from __future__ import annotations
@@ -12,12 +19,12 @@ from pydantic import BaseModel, Field
 
 
 class ImageAnalysisResponse(BaseModel):
-    """Structured response from Gemini image analysis.
+    """Структурированный ответ анализа изображения.
 
     Attributes:
-        alt_text: Brief description suitable for accessibility alt-text.
-        detailed_analysis: Comprehensive description of image content and features.
-        summary: Optional brief summary or conclusion about the image.
+        alt_text: Краткое описание для accessibility.
+        detailed_analysis: Детальное описание содержимого изображения.
+        summary: Краткое резюме.
     """
 
     alt_text: str = Field(
@@ -33,12 +40,12 @@ class ImageAnalysisResponse(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """Structured error response for API failures.
+    """Структурированный ответ с ошибкой.
 
     Attributes:
-        error: Human-readable error description.
-        details: Additional error details if available.
-        raw_response: Raw model response if format was unexpected.
+        error: Описание ошибки.
+        details: Дополнительные детали.
+        raw_response: Сырой ответ модели.
     """
 
     error: str = Field(..., description="Error description.")
@@ -52,7 +59,17 @@ class ErrorResponse(BaseModel):
 
 
 class AudioAnalysisResponse(BaseModel):
-    """Structured response from Gemini audio analysis."""
+    """Структурированный ответ анализа аудио.
+
+    Attributes:
+        title: Предлагаемый заголовок.
+        summary: Краткое содержание.
+        transcription: Полная транскрипция.
+        participants: Список участников.
+        hashtags: Ключевые слова.
+        action_items: Список задач.
+        raw_text: Сырой текст ответа модели.
+    """
 
     title: Optional[str] = Field(
         default=None, description="Suggested title for the audio."
@@ -76,7 +93,16 @@ class AudioAnalysisResponse(BaseModel):
 
 
 class VideoAnalysisResponse(BaseModel):
-    """Structured response from video analysis (frames + audio)."""
+    """Структурированный ответ анализа видео.
+
+    Attributes:
+        visual_summary: Сводка визуального содержимого.
+        audio_transcription: Транскрипция аудиодорожки.
+        audio_description: Описание неречевого аудио.
+        combined_narrative: Объединённый нарратив.
+        key_moments: Ключевые моменты.
+        raw_text: Сырой текст ответа модели.
+    """
 
     visual_summary: str = Field(
         ...,

@@ -1,11 +1,12 @@
-"""
-Batch Processor — обработка задач через Google Batch API.
+"""Обработчик пакетных задач через Google Batch API.
 
-Используется для операций с поддержкой Batch API (50% скидка):
-- IMG_GEN_BATCH
-- IMG_ANALYZE_BATCH
-- VIDEO_ANALYZE_BATCH
-- GIF_ANALYZE_BATCH
+Функции:
+    submit_pending_batches(db) -> int
+        Отправляет PENDING задачи в Google Batch API.
+    poll_active_batches(db) -> int
+        Проверяет статусы активных пакетов.
+    retrieve_completed_batches(db) -> int
+        Скачивает результаты завершённых пакетов.
 """
 
 import base64
@@ -22,65 +23,42 @@ from config import GEMINI_API_KEY, get_batch_model
 
 logger = logging.getLogger("gemini-media-mcp.worker.batch_processor")
 
-# Feature flag: включить реальный Batch API или использовать моки
 ENABLE_BATCH_API = os.getenv("ENABLE_BATCH_API", "true").lower() == "true"
 
-# Инициализация клиента Google Batch API
 client = None
 if ENABLE_BATCH_API:
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-        logger.info("Google Batch API client initialized (real mode)")
+        logger.info("✅ Google Batch API client инициализирован")
     except Exception as e:
-        logger.error(f"Failed to initialize Google Batch API client: {e}")
-        logger.warning("Falling back to MOCK mode")
+        logger.error(f"❌ Ошибка инициализации Google Batch API client: {e}")
+        logger.warning("⚠️ Переключение в MOCK режим")
         ENABLE_BATCH_API = False
         client = None
 else:
-    logger.info("ENABLE_BATCH_API=false → using MOCK mode (no API calls)")
+    logger.info("ℹ️ ENABLE_BATCH_API=false → MOCK режим")
 
 
 def submit_pending_batches(db) -> int:
-    """
-    Фаза 1: Отправка PENDING задач в Google Batch API.
-
-    Алгоритм:
-    1. Получить pending batches (не задачи!)
-    2. Отфильтровать только batch-режим (execution_mode='batch')
-    3. Для каждого пакета:
-       - Получить все задачи этого пакета
-       - Сформировать inline_requests из input_payload каждой задачи
-       - Вызвать client.batches.create() или mock
-       - Получить google_batch_id
-       - Обновить статусы (batch → SUBMITTED, tasks → SUBMITTED)
+    """Отправляет PENDING задачи в Google Batch API.
 
     Args:
-        db: DatabaseManager instance
+        db: DatabaseManager instance.
 
     Returns:
-        Количество отправленных пакетов
-
-    Raises:
-        Exception: При ошибках API — пакет помечается как FAILED
+        Количество отправленных пакетов.
     """
-    # Получить pending батчи (не задачи!)
     pending_batches = db.get_pending_batches()
 
-    # Фильтр: только batch-режим
     batch_mode_batches = []
     for batch in pending_batches:
-        # Получить ВСЕ задачи пакета через get_tasks_by_batch (не get_pending_tasks!)
-        # get_pending_tasks фильтрует по статусу, а нам нужны все задачи batch-а
         all_batch_tasks = db.get_tasks_by_batch(batch["id"])
-
-        # Фильтруем только PENDING задачи для отправки
         tasks_in_batch = [t for t in all_batch_tasks if t.get("status") == "PENDING"]
 
         if not tasks_in_batch:
-            logger.warning(f"Batch {batch['id']} has no PENDING tasks, skipping")
+            logger.warning(f"⚠️ Batch {batch['id']} не имеет PENDING задач, пропуск")
             continue
 
-        # Проверить execution_mode через operation_type первой задачи
         first_task = tasks_in_batch[0]
         op_type = db.get_operation_type(first_task["operation_type"])
 
@@ -94,46 +72,33 @@ def submit_pending_batches(db) -> int:
         tasks = item["tasks"]
         batch_id = batch["id"]
 
-        logger.info(f"Submitting batch {batch_id} with {len(tasks)} tasks")
+        logger.info(f"🚀 Отправка batch {batch_id} с {len(tasks)} задачами")
 
         try:
             if not ENABLE_BATCH_API:
-                # MOCK режим: создать фейковый google_batch_id для тестов
                 fake_google_id = f"batches/mock_{batch_id[:8]}"
-                logger.info(f"[MOCK] Created fake batch: {fake_google_id}")
+                logger.info(f"🧪 [MOCK] Создан batch: {fake_google_id}")
 
-                # Обновить статус пакета
                 db.update_batch_status(batch_id, "SUBMITTED", fake_google_id)
 
-                # Обновить статусы всех задач в пакете
                 for task in tasks:
                     db.update_task_status(task["id"], "SUBMITTED")
 
                 submitted_count += 1
             else:
-                # РЕАЛЬНЫЙ режим: отправка в Google Batch API через FILE-BASED метод
-                # Для генерации изображений inline режим НЕ сохраняет результаты,
-                # поэтому используем JSONL файл
-
-                # ⚠️ КРИТИЧНО: Детерминированная сортировка по (created_at, id)
                 tasks.sort(key=lambda t: (t["created_at"], t["id"]))
 
-                # Формируем JSONL файл с запросами
-                # Каждая строка: {"key": "task_id", "request": {...}}
                 jsonl_lines = []
                 for task in tasks:
                     input_payload = task.get("input_payload", {})
 
-                    # input_payload может быть JSON строкой или уже dict
                     if isinstance(input_payload, str):
                         input_payload = json.loads(input_payload)
 
-                    # Для IMG_GEN_BATCH: input_payload = {"prompt": "..."}
                     prompt = input_payload.get("prompt", "")
 
-                    # File-based формат с custom key для сопоставления
                     request_obj = {
-                        "key": task["id"],  # Используем task_id как ключ
+                        "key": task["id"],
                         "request": {
                             "contents": [{"parts": [{"text": prompt}], "role": "user"}],
                             "generation_config": {
@@ -220,32 +185,14 @@ def submit_pending_batches(db) -> int:
 
 
 def poll_active_batches(db) -> int:
-    """
-    Фаза 3 Шаг 2: Проверка статусов активных пакетов в Google Batch API.
-
-    Алгоритм:
-    1. Получить пакеты со статусом SUBMITTED/PROCESSING с google_batch_id
-    2. Для каждого пакета:
-       - Если Mock ID (batches/mock_*) → эмулировать переход к COMPLETED
-       - Если Real ID → запросить статус через client.batches.get()
-       - Преобразовать Google статус в DB статус через STATUS_MAP
-       - Обновить БД только если статус изменился
-    3. Обработать ошибки (404, rate limits) без краша
+    """Проверяет статусы активных пакетов в Google Batch API.
 
     Args:
-        db: DatabaseManager instance
+        db: DatabaseManager instance.
 
     Returns:
-        Количество обработанных пакетов (с обновлённым статусом или без)
-
-    Status Mapping (Google → DB):
-        JOB_STATE_PENDING    → SUBMITTED (или PROCESSING если хотим видеть движение)
-        JOB_STATE_RUNNING    → PROCESSING
-        JOB_STATE_SUCCEEDED  → COMPLETED (сигнал для Шага 3)
-        JOB_STATE_FAILED     → FAILED
-        JOB_STATE_CANCELLED  → FAILED
+        Количество обработанных пакетов.
     """
-    # 1. Получить активные пакеты (SUBMITTED или PROCESSING) с google_batch_id
     batches = db.get_pending_batches()
     active_batches = [
         b
@@ -256,16 +203,15 @@ def poll_active_batches(db) -> int:
     if not active_batches:
         return 0
 
-    logger.info(f"📊 Polling {len(active_batches)} active batches")
+    logger.info(f"📊 Проверка {len(active_batches)} активных пакетов")
 
-    # 2. Маппинг статусов Google → DB
     STATUS_MAP = {
-        "JOB_STATE_PENDING": "SUBMITTED",  # Ещё в очереди Google
-        "JOB_STATE_RUNNING": "PROCESSING",  # Google обрабатывает
-        "JOB_STATE_SUCCEEDED": "COMPLETED",  # Готов к скачиванию (Step 3)
-        "JOB_STATE_FAILED": "FAILED",  # Критическая ошибка
-        "JOB_STATE_CANCELLED": "FAILED",  # Отменён пользователем
-        "STATE_UNSPECIFIED": "SUBMITTED",  # Fallback для неизвестных статусов
+        "JOB_STATE_PENDING": "SUBMITTED",
+        "JOB_STATE_RUNNING": "PROCESSING",
+        "JOB_STATE_SUCCEEDED": "COMPLETED",
+        "JOB_STATE_FAILED": "FAILED",
+        "JOB_STATE_CANCELLED": "FAILED",
+        "STATE_UNSPECIFIED": "SUBMITTED",
     }
 
     processed_count = 0
@@ -361,41 +307,21 @@ def poll_active_batches(db) -> int:
 
 
 def retrieve_completed_batches(db) -> int:
-    """
-    Фаза 3 Шаг 3: Скачивание и обработка результатов COMPLETED пакетов.
-
-    Алгоритм:
-    1. Найти COMPLETED батчи с google_batch_id
-    2. Для каждого:
-       - Скачать JSONL из output_file_uri
-       - КРИТИЧЕСКАЯ ВАЛИДАЦИЯ: len(results) == len(tasks)
-       - Сопоставить по индексам (inline режим без custom_id)
-       - Сохранить файлы с шардингом media/generated/{batch_id}/{task_id}.png
-       - Обновить статусы задач (COMPLETED/FAILED)
-       - Закрыть батч
+    """Скачивает и обрабатывает результаты COMPLETED пакетов.
 
     Args:
-        db: DatabaseManager instance
+        db: DatabaseManager instance.
 
     Returns:
-        Количество обработанных батчей
-
-    Security Notes:
-        - Паранойя-режим: если len(results) != len(tasks) → весь батч FAILED
-        - Детерминированная сортировка tasks по (created_at, id)
-        - Атомарность: файл на диск → потом БД
+        Количество обработанных батчей.
     """
-    # 1. Найти COMPLETED батчи с google_batch_id
-    # ВАЖНО: get_pending_batches() не включает COMPLETED статусы
-    # Нужно явно запросить батчи со статусом COMPLETED
     all_batches = db.get_pending_batches()
 
-    # Добавить COMPLETED батчи (которые могут быть готовы к retrieval)
     try:
         completed_status_batches = db._batches.get_by_status("COMPLETED")
         all_batches.extend(completed_status_batches)
     except Exception as e:
-        logger.warning(f"Failed to query COMPLETED batches: {e}")
+        logger.warning(f"⚠️ Не удалось запросить COMPLETED батчи: {e}")
 
     completed_batches = [
         b
@@ -407,7 +333,7 @@ def retrieve_completed_batches(db) -> int:
         return 0
 
     logger.info(
-        f"📥 Retrieving results from {len(completed_batches)} completed batches"
+        f"📥 Загрузка результатов из {len(completed_batches)} завершённых пакетов"
     )
 
     processed_count = 0
@@ -591,30 +517,22 @@ def retrieve_completed_batches(db) -> int:
 
 
 def _extract_image_data_from_dict(response: dict) -> str:
-    """
-    Извлечь base64 данные изображения из dict ответа Google Batch API.
-
-    Структура ответа (file-based JSONL):
-    response["candidates"][0]["content"]["parts"][0]["inlineData"]["data"]
-
-    Также поддерживает старый формат с "inline_data" (snake_case).
+    """Извлекает base64 данные изображения из ответа Google Batch API.
 
     Args:
-        response: Dict с ответом из JSONL файла
+        response: Dict с ответом из JSONL файла.
 
     Returns:
-        Base64 строка
+        Base64 строка.
 
     Raises:
-        ValueError: Если нет данных изображения в ответе
+        ValueError: Если нет данных изображения в ответе.
     """
     try:
         candidate = response["candidates"][0]
         parts = candidate["content"]["parts"]
 
-        # Ищем часть с изображением (может быть text + image)
         for part in parts:
-            # Проверяем оба формата: camelCase (из JSONL) и snake_case
             inline_data = part.get("inlineData") or part.get("inline_data")
             if inline_data:
                 data = inline_data.get("data")
@@ -630,28 +548,20 @@ def _extract_image_data_from_dict(response: dict) -> str:
 def _save_image(
     batch_id: str, task_id: str, base64_data: str, target_path: str = None
 ) -> str:
-    """
-    Сохранить изображение из base64 с файловым шардингом.
-
-    Стратегия сохранения:
-    1. Приоритет: target_path из задачи (если указан и доступен)
-    2. Fallback: media/generated/{batch_id}/{task_id}.png (шардинг по батчам)
+    """Сохраняет изображение из base64 с файловым шардингом.
 
     Args:
-        batch_id: UUID батча (для шардинга)
-        task_id: UUID задачи (для имени файла)
-        base64_data: Base64 строка изображения
-        target_path: Путь из задачи (опционально)
+        batch_id: UUID батча.
+        task_id: UUID задачи.
+        base64_data: Base64 строка изображения.
+        target_path: Путь из задачи.
 
     Returns:
-        Абсолютный путь к сохранённому файлу
+        Абсолютный путь к сохранённому файлу.
 
     Raises:
-        IOError: Если не удалось сохранить даже в fallback директорию
-    Raises:
-        IOError: Если не удалось сохранить даже в fallback директорию
+        IOError: Если не удалось сохранить файл.
     """
-    # Декодировать base64
     image_bytes = base64.b64decode(base64_data)
     if target_path:
         try:
@@ -661,15 +571,13 @@ def _save_image(
             with open(local_path, "wb") as f:
                 f.write(image_bytes)
 
-            logger.debug(f"💾 Saved to target_path: {local_path}")
+            logger.debug(f"💾 Сохранено в target_path: {local_path}")
             return str(local_path.absolute())
         except (IOError, OSError) as e:
             logger.warning(
-                f"⚠️ Failed to save to target_path {target_path}: {e}. Using fallback."
+                f"⚠️ Не удалось сохранить в {target_path}: {e}. Использую fallback."
             )
 
-    # Попытка 2: Fallback — шардинг по batch_id
-    # media/generated/{batch_id}/{task_id}.png
     output_dir = Path("media") / "generated" / batch_id
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -678,5 +586,5 @@ def _save_image(
     with open(local_path, "wb") as f:
         f.write(image_bytes)
 
-    logger.debug(f"💾 Saved to fallback (sharded): {local_path}")
+    logger.debug(f"💾 Сохранено в fallback: {local_path}")
     return str(local_path.absolute())

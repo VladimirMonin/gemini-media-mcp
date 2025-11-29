@@ -1,17 +1,30 @@
+"""Скрипт установки конфигурации MCP сервера.
+
+Функции:
+    main(gemini_api_key: str, config_path: Path) -> None
+        Устанавливает конфигурацию Gemini Media MCP сервера.
+"""
+
 import typer
 from pathlib import Path
 import json
 
 app = typer.Typer()
 
+
 @app.command()
 def main(
-    gemini_api_key: str = typer.Option(..., "--gemini-api-key", "-k", help="Gemini API Key"),
-    config_path: Path = typer.Option("~/.mcp/servers_config.json", "--config-path", "-c", help="Path to MCP servers_config.json"),
+    gemini_api_key: str = typer.Option(
+        ..., "--gemini-api-key", "-k", help="Gemini API Key"
+    ),
+    config_path: Path = typer.Option(
+        "~/.mcp/servers_config.json",
+        "--config-path",
+        "-c",
+        help="Path to MCP servers_config.json",
+    ),
 ):
-    """
-    Installs the Gemini Media MCP server configuration.
-    """
+    """Устанавливает конфигурацию Gemini Media MCP сервера."""
     config_path = config_path.expanduser()
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -24,9 +37,7 @@ def main(
     server_config = {
         "command": "python",
         "args": ["-m", "server"],
-        "env": {
-            "GEMINI_API_KEY": gemini_api_key
-        }
+        "env": {"GEMINI_API_KEY": gemini_api_key},
     }
 
     config["mcpServers"]["gemini-media-analyzer"] = server_config
@@ -34,7 +45,8 @@ def main(
     with open(config_path, "w") as f:
         json.dump(config, f, indent=2)
 
-    print(f"✅ Gemini Media MCP server configured in {config_path}")
+    print(f"✅ Gemini Media MCP сервер настроен: {config_path}")
+
 
 if __name__ == "__main__":
     app()

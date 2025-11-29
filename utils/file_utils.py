@@ -1,7 +1,12 @@
-"""File handling utilities for image validation and MIME type detection.
+"""Утилиты для работы с файлами и валидации изображений.
 
-This module provides utilities for working with image files, including
-MIME type detection, file validation, and binary file reading operations.
+Функции:
+    get_file_mime_type(file_path: str) -> str | None
+        Определяет MIME-тип файла.
+    read_file_as_bytes(file_path: str) -> bytes
+        Читает файл как байты.
+    is_image_valid(file_path: str) -> bool
+        Проверяет, является ли файл поддерживаемым изображением.
 """
 
 import mimetypes
@@ -20,16 +25,13 @@ SUPPORTED_IMAGE_MIME_TYPES: List[str] = [
 
 
 def get_file_mime_type(file_path: str) -> str | None:
-    """Detect MIME type of a file.
-
-    Attempts to determine MIME type using mimetypes library,
-    with fallback to extension-based detection.
+    """Определяет MIME-тип файла.
 
     Args:
-        file_path: Path to the file to analyze.
+        file_path: Путь к файлу.
 
     Returns:
-        MIME type string, or 'application/octet-stream' for unknown types.
+        MIME-тип или 'application/octet-stream' для неизвестных типов.
     """
     mime_type, _ = mimetypes.guess_type(file_path)
     if mime_type:
@@ -50,17 +52,17 @@ def get_file_mime_type(file_path: str) -> str | None:
 
 
 def read_file_as_bytes(file_path: str) -> bytes:
-    """Read file contents as bytes.
+    """Читает содержимое файла как байты.
 
     Args:
-        file_path: Path to the file to read.
+        file_path: Путь к файлу.
 
     Returns:
-        File contents as bytes.
+        Содержимое файла как байты.
 
     Raises:
-        FileNotFoundError: If the file does not exist.
-        IOError: If an error occurs during file reading.
+        FileNotFoundError: Если файл не найден.
+        IOError: Ошибка чтения файла.
     """
     try:
         with open(file_path, "rb") as f:
@@ -72,13 +74,13 @@ def read_file_as_bytes(file_path: str) -> bytes:
 
 
 def is_image_valid(file_path: str) -> bool:
-    """Validate if a file is a supported image type.
+    """Проверяет, является ли файл поддерживаемым изображением.
 
     Args:
-        file_path: Path to the file to validate.
+        file_path: Путь к файлу.
 
     Returns:
-        True if the file exists and is a supported image type, False otherwise.
+        True если файл существует и является поддерживаемым изображением.
     """
     if not os.path.exists(file_path):
         return False

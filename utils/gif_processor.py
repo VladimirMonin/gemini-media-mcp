@@ -1,4 +1,13 @@
-"""GIF animation processing utilities for Gemini API."""
+"""Утилиты обработки GIF-анимаций.
+
+Функции:
+    extract_gif_frames(image: Image.Image, mode: str, ...) -> list[Image.Image]
+        Извлекает кадры из анимированного GIF.
+    resize_image(image: Image.Image, max_dimension: int) -> Image.Image
+        Изменяет размер изображения с сохранением пропорций.
+    create_animation_prompt(user_prompt: str, ...) -> str
+        Создаёт контекстно-зависимый промпт для анализа анимации.
+"""
 
 from typing import Optional, Literal
 from PIL import Image
@@ -14,30 +23,20 @@ def extract_gif_frames(
     frame_count: Optional[int] = None,
     interval_sec: Optional[float] = None,
 ) -> list[Image.Image]:
-    """Extract frames from animated GIF using different strategies.
+    """Извлекает кадры из анимированного GIF.
 
     Args:
-        image: PIL Image object (animated GIF)
-        mode: Extraction mode ('fps', 'total', 'interval')
-        gif_fps: Frames per second to extract (for 'fps' mode)
-        frame_count: Total number of frames to extract (for 'total' mode)
-        interval_sec: Time interval in seconds (for 'interval' mode)
+        image: PIL Image объект (анимированный GIF).
+        mode: Режим извлечения ('fps', 'total', 'interval').
+        gif_fps: Кадров в секунду для режима 'fps'.
+        frame_count: Количество кадров для режима 'total'.
+        interval_sec: Интервал в секундах для режима 'interval'.
 
     Returns:
-        List of extracted frames as PIL Images
+        Список извлечённых кадров как PIL Images.
 
     Raises:
-        ValueError: If required parameters for mode are missing
-
-    Examples:
-        # Mode 1: Extract at 1 FPS
-        frames = extract_gif_frames(gif, mode='fps', gif_fps=1.0)
-
-        # Mode 2: Extract exactly 5 frames (evenly distributed)
-        frames = extract_gif_frames(gif, mode='total', frame_count=5)
-
-        # Mode 3: Extract frame every 5 seconds
-        frames = extract_gif_frames(gif, mode='interval', interval_sec=5.0)
+        ValueError: Если требуемые параметры для режима отсутствуют.
     """
     if not getattr(image, "is_animated", False):
         logger.info("Image is not animated, returning single frame")
@@ -88,37 +87,13 @@ def extract_gif_frames(
 def _get_fps_indices(
     total_frames: int, native_fps: float, target_fps: float
 ) -> list[int]:
-    """Calculate frame indices for FPS mode.
-
-    Args:
-        total_frames: Total number of frames in GIF
-        native_fps: GIF's native frame rate
-        target_fps: Desired extraction rate
-
-    Returns:
-        List of frame indices to extract
-    """
+    """Рассчитывает индексы кадров для режима FPS."""
     frame_step = max(1, int(native_fps / target_fps))
     return list(range(0, total_frames, frame_step))
 
 
 def _get_total_indices(total_frames: int, frame_count: int) -> list[int]:
-    """Calculate evenly distributed frame indices for TOTAL mode.
-
-    Args:
-        total_frames: Total number of frames in GIF
-        frame_count: Desired number of frames to extract
-
-    Returns:
-        List of evenly distributed frame indices
-
-    Examples:
-        # 30 frames, want 5
-        _get_total_indices(30, 5)  # [0, 6, 12, 18, 24]
-
-        # 180 frames (3 min at 1fps), want 5
-        _get_total_indices(180, 5)  # [0, 36, 72, 108, 144]
-    """
+    """Рассчитывает равномерно распределённые индексы кадров для режима TOTAL."""
     if frame_count >= total_frames:
         return list(range(total_frames))
 
@@ -132,16 +107,7 @@ def _get_total_indices(total_frames: int, frame_count: int) -> list[int]:
 def _get_interval_indices(
     total_frames: int, total_duration_sec: float, interval_sec: float
 ) -> list[int]:
-    """Calculate frame indices for INTERVAL mode.
-
-    Args:
-        total_frames: Total number of frames in GIF
-        total_duration_sec: Total duration in seconds
-        interval_sec: Time interval in seconds
-
-    Returns:
-        List of frame indices at specified intervals
-    """
+    """Рассчитывает индексы кадров для режима INTERVAL."""
     if total_duration_sec <= 0:
         return [0]
 
@@ -152,14 +118,7 @@ def _get_interval_indices(
 
 
 def _convert_frame(frame: Image.Image) -> Image.Image:
-    """Convert frame to compatible mode for Gemini API.
-
-    Args:
-        frame: PIL Image frame
-
-    Returns:
-        Converted frame in compatible mode
-    """
+    """Конвертирует кадр в совместимый режим для Gemini API."""
     # Convert palette mode (P) and other incompatible modes to RGB
     if frame.mode in ("P", "LA", "PA"):
         return frame.convert("RGB")
@@ -171,14 +130,14 @@ def _convert_frame(frame: Image.Image) -> Image.Image:
 
 
 def resize_image(image: Image.Image, max_dimension: Optional[int]) -> Image.Image:
-    """Resize image maintaining aspect ratio.
+    """Изменяет размер изображения с сохранением пропорций.
 
     Args:
-        image: PIL Image object
-        max_dimension: Maximum size for longest side (None = no resize)
+        image: PIL Image объект.
+        max_dimension: Максимальный размер длинной стороны.
 
     Returns:
-        Resized image
+        Изображение с изменённым размером.
     """
     if max_dimension is None:
         return image
@@ -199,16 +158,16 @@ def resize_image(image: Image.Image, max_dimension: Optional[int]) -> Image.Imag
 def create_animation_prompt(
     user_prompt: str, frame_count: int, extraction_info: str, system_prompt: str
 ) -> str:
-    """Create context-aware prompt for GIF animation analysis.
+    """Создаёт контекстно-зависимый промпт для анализа анимации.
 
     Args:
-        user_prompt: User's original prompt
-        frame_count: Number of extracted frames
-        extraction_info: Description of extraction method
-        system_prompt: System prompt explaining animation analysis approach
+        user_prompt: Оригинальный промпт пользователя.
+        frame_count: Количество извлечённых кадров.
+        extraction_info: Описание метода извлечения.
+        system_prompt: Системный промпт.
 
     Returns:
-        Enhanced prompt with animation context
+        Расширенный промпт с контекстом анимации.
     """
     context_prompt = f"""{system_prompt}
 

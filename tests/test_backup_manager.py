@@ -1,4 +1,11 @@
-"""Tests for backup_manager module."""
+"""Тесты для модуля backup_manager.
+
+Классы:
+    TestSanitizeDescription — тесты санитизации описаний.
+    TestCreateBackupFilename — тесты генерации имён файлов.
+    TestSaveMetadataJson — тесты сохранения JSON метаданных.
+    TestBackupGeneration — тесты полного workflow бэкапа.
+"""
 
 import pytest
 import os
@@ -22,15 +29,15 @@ from utils.backup_manager import (
 
 
 class TestSanitizeDescription:
-    """Tests for description sanitization."""
+    """Тесты санитизации описаний."""
 
     def test_simple_prompt(self):
-        """Test simple prompt extraction."""
+        """Проверяет извлечение простого промпта."""
         result = sanitize_description("A beautiful sunset over the ocean")
         assert result == "A_beautiful_sunset_o"
 
     def test_long_prompt(self):
-        """Test truncation to 20 chars."""
+        """Проверяет обрезку до 20 символов."""
         result = sanitize_description(
             "This is a very long prompt that should be truncated"
         )
@@ -38,31 +45,31 @@ class TestSanitizeDescription:
         assert result == "This_is_a_very_long"
 
     def test_special_characters(self):
-        """Test special character replacement."""
+        """Проверяет замену специальных символов."""
         result = sanitize_description("Hello, world! @#$%")
         assert result == "Hello__world"
 
     def test_multiple_spaces(self):
-        """Test multiple spaces collapse."""
+        """Проверяет схлопывание множественных пробелов."""
         result = sanitize_description("Hello    world")
         assert result == "Hello_world"
 
     def test_empty_string(self):
-        """Test empty string handling."""
+        """Проверяет обработку пустой строки."""
         result = sanitize_description("")
         assert result == "generated"
 
     def test_only_special_chars(self):
-        """Test string with only special chars."""
+        """Проверяет строку только из спецсимволов."""
         result = sanitize_description("@#$%^&*()")
         assert result == "generated"
 
 
 class TestCreateBackupFilename:
-    """Tests for backup filename generation."""
+    """Тесты генерации имён backup файлов."""
 
     def test_image_filename_format(self):
-        """Test filename format for images."""
+        """Проверяет формат имени файла для изображений."""
         filename = create_backup_filename("image", "png", "test prompt")
 
         # Should have format: YYYY-MM-DD_HH-MM-SS_description.png
@@ -70,14 +77,14 @@ class TestCreateBackupFilename:
         assert "test_prompt" in filename.lower()
 
     def test_audio_filename_format(self):
-        """Test filename format for audio."""
+        """Проверяет формат имени файла для аудио."""
         filename = create_backup_filename("audio", "wav", "audio test")
 
         assert filename.endswith(".wav")
         assert "audio_test" in filename.lower()
 
     def test_different_extensions(self):
-        """Test various file extensions."""
+        """Проверяет различные расширения файлов."""
         filename_png = create_backup_filename("image", "png")
         filename_wav = create_backup_filename("audio", "wav")
         filename_jpg = create_backup_filename("image", "jpg")
@@ -87,7 +94,7 @@ class TestCreateBackupFilename:
         assert filename_jpg.endswith(".jpg")
 
     def test_timestamp_uniqueness(self):
-        """Test that filenames generated in sequence are unique."""
+        """Проверяет уникальность имён файлов по времени."""
         filename1 = create_backup_filename("image", "png", "test")
         time.sleep(1)  # Wait 1 second
         filename2 = create_backup_filename("image", "png", "test")
@@ -97,10 +104,10 @@ class TestCreateBackupFilename:
 
 
 class TestSaveMetadataJson:
-    """Tests for JSON metadata saving."""
+    """Тесты сохранения JSON метаданных."""
 
     def test_save_metadata(self, tmp_path):
-        """Test metadata JSON creation."""
+        """Проверяет создание JSON метаданных."""
         metadata = {
             "timestamp": datetime.now().isoformat(),
             "file_path": str(tmp_path / "test_image.png"),
@@ -127,10 +134,10 @@ class TestSaveMetadataJson:
 
 
 class TestBackupGeneration:
-    """Tests for complete backup workflow."""
+    """Тесты полного workflow бэкапа."""
 
     def test_backup_image_file(self, tmp_path):
-        """Test backing up an image file."""
+        """Проверяет бэкап файла изображения."""
         # Create source file
         source_file = tmp_path / "original.png"
         source_file.write_bytes(b"fake png data")
@@ -168,7 +175,7 @@ class TestBackupGeneration:
             assert loaded["parameters"]["prompt"] == "Test image generation"
 
     def test_backup_audio_file(self, tmp_path):
-        """Test backing up an audio file."""
+        """Проверяет бэкап аудиофайла."""
         source_file = tmp_path / "original.wav"
         source_file.write_bytes(b"fake wav data")
 
@@ -198,7 +205,7 @@ class TestBackupGeneration:
             assert loaded["parameters"]["yaml_script"] == "/path/to/script.yaml"
 
     def test_multiple_backups_dont_overwrite(self, tmp_path):
-        """Test that multiple backups create unique files."""
+        """Проверяет, что множественные бэкапы создают уникальные файлы."""
         source_file = tmp_path / "source.png"
         source_file.write_bytes(b"data v1")
 
@@ -246,7 +253,7 @@ class TestBackupGeneration:
             assert f.read() == b"data v2"
 
     def test_backup_with_missing_file(self, tmp_path):
-        """Test that backup fails gracefully with missing file."""
+        """Проверяет, что бэкап с отсутствующим файлом завершается с ошибкой."""
         missing_file = tmp_path / "nonexistent.png"
 
         metadata = {

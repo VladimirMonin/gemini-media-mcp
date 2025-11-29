@@ -1,7 +1,16 @@
-"""Utility modules for the MCP server.
+"""Утилиты MCP сервера.
 
-This package contains utility modules for file handling, API clients,
-and logging configuration.
+Функции:
+    get_file_mime_type(file_path: str) -> str | None
+        Определяет MIME-тип файла.
+    is_image_valid(file_path: str) -> bool
+        Проверяет, является ли файл поддерживаемым изображением.
+    get_logger(name: str) -> logging.Logger
+        Получает настроенный экземпляр логгера.
+
+Классы:
+    GeminiClient
+        Клиент для работы с Gemini API.
 """
 
 from utils.file_utils import (

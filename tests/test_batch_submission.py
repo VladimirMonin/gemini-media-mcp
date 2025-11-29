@@ -1,14 +1,8 @@
-"""
-Тесты для Batch Processor — отправка задач в Google Batch API.
+"""Тесты для Batch Submission — отправка задач в Google Batch API.
 
-Фаза 3, Шаг 1: submit_pending_batches()
-
-Проверяет:
-- Mock режим: создание fake google_batch_id без API вызовов
-- Реальный режим: пропускается в CI (требует реальный API ключ)
-- Обработка ошибок: batch → FAILED при исключениях
-- Статусы: batch → SUBMITTED, tasks → SUBMITTED
-- Фильтрация: только execution_mode='batch'
+Классы:
+    TestBatchSubmission — тесты submit_pending_batches().
+    TestBatchSubmissionErrors — тесты обработки ошибок.
 """
 
 import os
@@ -25,7 +19,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 @pytest.fixture
 def temp_db(tmp_path):
-    """Временная БД для тестов."""
+    """Создаёт временную БД для тестов."""
     db_path = tmp_path / "test_batch_submission.db"
     db = DatabaseManager()
     db.initialize(str(db_path))
@@ -35,7 +29,7 @@ def temp_db(tmp_path):
 
 @pytest.fixture
 def mock_mode(monkeypatch):
-    """Принудительно включить MOCK режим для тестов."""
+    """Включает MOCK режим для тестов."""
     # Патчим переменную в модуле batch_processor
     import worker.processors.batch_processor as bp
 
@@ -45,10 +39,10 @@ def mock_mode(monkeypatch):
 
 
 class TestBatchSubmission:
-    """Тесты для submit_pending_batches()."""
+    """Тесты submit_pending_batches()."""
 
     def test_mock_mode_creates_fake_batch_id(self, temp_db, mock_mode):
-        """Mock режим создаёт fake google_batch_id без API вызовов."""
+        """Проверяет создание fake google_batch_id в mock режиме."""
         # Создать batch-операцию
         batch_id = str(uuid4())
         temp_db.create_batch(
@@ -96,7 +90,7 @@ class TestBatchSubmission:
         assert task_2["status"] == "SUBMITTED", "Задача 2 должна быть SUBMITTED"
 
     def test_filters_only_batch_mode(self, temp_db, mock_mode):
-        """Только execution_mode='batch' задачи отправляются."""
+        """Проверяет, что только execution_mode='batch' задачи отправляются."""
         # Создать sync-операцию (не batch)
         sync_batch_id = str(uuid4())
         temp_db.create_batch(
@@ -152,7 +146,7 @@ class TestBatchSubmission:
         )
 
     def test_empty_batch_skipped(self, temp_db, mock_mode):
-        """Пакет без задач пропускается."""
+        """Проверяет, что пакет без задач пропускается."""
         # Создать пакет без задач
         empty_batch_id = str(uuid4())
         temp_db.create_batch(
@@ -220,10 +214,10 @@ class TestBatchSubmission:
 
 
 class TestBatchSubmissionErrors:
-    """Тесты обработки ошибок."""
+    """Тесты обработки ошибок отправки."""
 
     def test_api_error_marks_batch_failed(self, temp_db, monkeypatch):
-        """При ошибке API пакет помечается как FAILED."""
+        """Проверяет, что при ошибке API пакет помечается как FAILED."""
 
         # Патчим client.batches.create, чтобы он выбрасывал исключение
         def mock_create_error(*args, **kwargs):

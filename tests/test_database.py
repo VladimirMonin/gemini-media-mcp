@@ -1,4 +1,13 @@
-"""Tests for database package."""
+"""Тесты для пакета database.
+
+Классы:
+    TestInitialization — тесты инициализации БД.
+    TestOperationTypes — тесты операций с типами операций.
+    TestBatches — тесты CRUD операций с пакетами.
+    TestTasks — тесты CRUD операций с задачами.
+    TestTransactions — тесты транзакционных операций.
+    TestUtilities — тесты вспомогательных функций.
+"""
 
 import pytest
 import tempfile
@@ -17,7 +26,7 @@ from database import DatabaseManager
 
 @pytest.fixture
 def temp_db():
-    """Create temporary database for testing."""
+    """Создаёт временную БД для тестирования."""
     # Create temp file
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
@@ -37,10 +46,10 @@ def temp_db():
 
 
 class TestInitialization:
-    """Tests for database initialization."""
+    """Тесты инициализации базы данных."""
 
     def test_initialize_creates_tables(self, temp_db):
-        """Test that initialization creates all tables."""
+        """Проверяет, что инициализация создаёт все таблицы."""
         conn = temp_db.get_connection()
         cursor = conn.cursor()
 
@@ -63,7 +72,7 @@ class TestInitialization:
         assert result is not None
 
     def test_seed_data_loaded(self, temp_db):
-        """Test that seed data is loaded into operation_types."""
+        """Проверяет, что seed данные загружены в operation_types."""
         op_types = temp_db.get_all_operation_types()
         assert len(op_types) == 11  # 6 sync + 4 batch + 1 local_queue (TTS_GEN_QUEUE)
 
@@ -75,29 +84,29 @@ class TestInitialization:
 
 
 class TestOperationTypes:
-    """Tests for operation_types operations."""
+    """Тесты операций с типами операций."""
 
     def test_get_operation_type_exists(self, temp_db):
-        """Test getting existing operation type."""
+        """Проверяет получение существующего типа операции."""
         result = temp_db.get_operation_type("IMG_GEN_BATCH")
         assert result is not None
         assert result["operation_type"] == "IMG_GEN_BATCH"
         assert result["execution_mode"] == "batch"
 
     def test_get_operation_type_not_exists(self, temp_db):
-        """Test getting non-existent operation type."""
+        """Проверяет получение несуществующего типа операции."""
         result = temp_db.get_operation_type("INVALID_OP")
         assert result is None
 
     def test_get_all_operation_types(self, temp_db):
-        """Test getting all operation types."""
+        """Проверяет получение всех типов операций."""
         result = temp_db.get_all_operation_types()
         assert isinstance(result, list)
         assert len(result) > 0
         assert all("operation_type" in op for op in result)
 
     def test_get_execution_mode(self, temp_db):
-        """Test getting execution mode."""
+        """Проверяет получение режима выполнения."""
         mode = temp_db.get_execution_mode("IMG_GEN_BATCH")
         assert mode == "batch"
 
@@ -105,16 +114,16 @@ class TestOperationTypes:
         assert mode == "sync"
 
     def test_get_execution_mode_invalid(self, temp_db):
-        """Test getting execution mode for invalid operation."""
+        """Проверяет ошибку при получении режима для недействительной операции."""
         with pytest.raises(ValueError, match="Unknown operation_type"):
             temp_db.get_execution_mode("INVALID_OP")
 
 
 class TestBatches:
-    """Tests for batches CRUD operations."""
+    """Тесты CRUD операций с пакетами."""
 
     def test_create_batch(self, temp_db):
-        """Test creating a batch."""
+        """Проверяет создание пакета."""
         batch_id = str(uuid4())
         temp_db.create_batch(batch_id, "IMG_GEN_BATCH", 5)
 
@@ -127,18 +136,18 @@ class TestBatches:
         assert batch["status"] == "PENDING"
 
     def test_create_batch_invalid_operation(self, temp_db):
-        """Test creating batch with invalid operation type."""
+        """Проверяет создание пакета с недействительным типом операции."""
         batch_id = str(uuid4())
         with pytest.raises(ValueError, match="Unknown operation_type"):
             temp_db.create_batch(batch_id, "INVALID_OP", 5)
 
     def test_get_batch_not_exists(self, temp_db):
-        """Test getting non-existent batch."""
+        """Проверяет получение несуществующего пакета."""
         result = temp_db.get_batch("nonexistent-id")
         assert result is None
 
     def test_update_batch_status(self, temp_db):
-        """Test updating batch status."""
+        """Проверяет обновление статуса пакета."""
         batch_id = str(uuid4())
         temp_db.create_batch(batch_id, "IMG_GEN_BATCH", 5)
 
@@ -151,7 +160,7 @@ class TestBatches:
         assert batch["google_batch_id"] == "google-batch-123"
 
     def test_update_batch_completed(self, temp_db):
-        """Test completing a batch."""
+        """Проверяет завершение пакета."""
         batch_id = str(uuid4())
         temp_db.create_batch(batch_id, "IMG_GEN_BATCH", 5)
 
@@ -164,7 +173,7 @@ class TestBatches:
         assert batch["completed_at"] is not None
 
     def test_get_pending_batches(self, temp_db):
-        """Test getting pending batches."""
+        """Проверяет получение ожидающих пакетов."""
         # Create batches with different statuses
         batch1 = str(uuid4())
         batch2 = str(uuid4())
@@ -186,10 +195,10 @@ class TestBatches:
 
 
 class TestTasks:
-    """Tests for tasks CRUD operations."""
+    """Тесты CRUD операций с задачами."""
 
     def test_create_task(self, temp_db):
-        """Test creating a task."""
+        """Проверяет создание задачи."""
         batch_id = str(uuid4())
         task_id = str(uuid4())
 
@@ -213,12 +222,12 @@ class TestTasks:
         assert task["target_path"] == "/tmp/test.png"
 
     def test_get_task_not_exists(self, temp_db):
-        """Test getting non-existent task."""
+        """Проверяет получение несуществующей задачи."""
         result = temp_db.get_task("nonexistent-id")
         assert result is None
 
     def test_update_task_status(self, temp_db):
-        """Test updating task status."""
+        """Проверяет обновление статуса задачи."""
         batch_id = str(uuid4())
         task_id = str(uuid4())
 
@@ -239,7 +248,7 @@ class TestTasks:
         assert task["status"] == "PROCESSING"
 
     def test_update_task_completed(self, temp_db):
-        """Test completing a task."""
+        """Проверяет завершение задачи."""
         batch_id = str(uuid4())
         task_id = str(uuid4())
 
@@ -262,7 +271,7 @@ class TestTasks:
         assert task["completed_at"] is not None
 
     def test_update_task_failed(self, temp_db):
-        """Test failing a task."""
+        """Проверяет провал задачи."""
         batch_id = str(uuid4())
         task_id = str(uuid4())
 
@@ -285,7 +294,7 @@ class TestTasks:
         assert task["completed_at"] is not None
 
     def test_get_tasks_by_batch(self, temp_db):
-        """Test getting all tasks by batch."""
+        """Проверяет получение всех задач пакета."""
         batch_id = str(uuid4())
         task1 = str(uuid4())
         task2 = str(uuid4())
@@ -312,7 +321,7 @@ class TestTasks:
         assert all(t["batch_id"] == batch_id for t in tasks)
 
     def test_get_pending_tasks(self, temp_db):
-        """Test getting pending tasks."""
+        """Проверяет получение ожидающих задач."""
         batch_id = str(uuid4())
         task1 = str(uuid4())
         task2 = str(uuid4())
@@ -339,7 +348,7 @@ class TestTasks:
         assert all(t["status"] == "PENDING" for t in pending)
 
     def test_search_tasks(self, temp_db):
-        """Test searching tasks."""
+        """Проверяет поиск задач."""
         batch_id = str(uuid4())
         task1 = str(uuid4())
         task2 = str(uuid4())
@@ -369,10 +378,10 @@ class TestTasks:
 
 
 class TestTransactions:
-    """Tests for transactional operations."""
+    """Тесты транзакционных операций."""
 
     def test_create_batch_with_tasks(self, temp_db):
-        """Test atomic batch + tasks creation."""
+        """Проверяет атомарное создание пакета с задачами."""
         batch_id = str(uuid4())
         task1 = str(uuid4())
         task2 = str(uuid4())
@@ -407,10 +416,10 @@ class TestTransactions:
 
 
 class TestUtilities:
-    """Tests for utility operations."""
+    """Тесты вспомогательных операций."""
 
     def test_get_stats(self, temp_db):
-        """Test getting database statistics."""
+        """Проверяет получение статистики БД."""
         batch_id = str(uuid4())
         task1 = str(uuid4())
         task2 = str(uuid4())
@@ -442,7 +451,7 @@ class TestUtilities:
         assert stats["batches_active"] == 1
 
     def test_retry_task(self, temp_db):
-        """Test retrying a failed task."""
+        """Проверяет повторную попытку провалившейся задачи."""
         batch_id = str(uuid4())
         task_id = str(uuid4())
 
@@ -467,7 +476,7 @@ class TestUtilities:
         assert task["error_details"] is None
 
     def test_retry_task_not_failed(self, temp_db):
-        """Test retrying a task that is not failed."""
+        """Проверяет ошибку при повторе не провалившейся задачи."""
         batch_id = str(uuid4())
         task_id = str(uuid4())
 
@@ -485,7 +494,7 @@ class TestUtilities:
             temp_db.retry_task(task_id)
 
     def test_cancel_batch(self, temp_db):
-        """Test cancelling a pending batch."""
+        """Проверяет отмену ожидающего пакета."""
         batch_id = str(uuid4())
         task1 = str(uuid4())
         task2 = str(uuid4())
@@ -521,7 +530,7 @@ class TestUtilities:
         assert all("Cancelled by user" in t["error_details"] for t in tasks)
 
     def test_get_batch_progress(self, temp_db):
-        """Test getting batch progress."""
+        """Проверяет получение прогресса пакета."""
         batch_id = str(uuid4())
         task1 = str(uuid4())
         task2 = str(uuid4())
