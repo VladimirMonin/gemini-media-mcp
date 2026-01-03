@@ -10,3 +10,4 @@ media/tts/*.wav
 media/generated/
 docs/.DS_Store
 .DS_Store
+tasks.db
