@@ -67,14 +67,19 @@ def get_tier() -> str:
     Поддерживаемые значения: 'free', 'tier1'
 
     Returns:
-        str: Tier пользователя (по умолчанию 'free')
+        str: Tier пользователя (по умолчанию 'tier1')
+        
+    Note:
+        По умолчанию используется 'tier1', т.к. бесплатный tier от Google
+        сильно ограничен. Если нужно явно использовать free tier - укажите
+        GEMINI_TIER=free в переменных окружения.
     """
-    tier = os.getenv("GEMINI_TIER", "free").lower()
+    tier = os.getenv("GEMINI_TIER", "tier1").lower()
     valid_tiers = ["free", "tier1"]
 
     if tier not in valid_tiers:
-        # Если указан некорректный tier, используем free
-        return "free"
+        # Если указан некорректный tier, используем tier1
+        return "tier1"
 
     return tier
 
@@ -265,6 +270,10 @@ def validate_model_for_tier(
                 "в env переменных вашего MCP клиента (Claude Desktop, Cline и т.д.).\n"
                 "Инструкция: добавьте 'GEMINI_TIER': 'tier1' в секцию 'env' конфигурации сервера."
             )
+        # Если model_name пустой - проверяем только доступность функции
+        if not model_name:
+            return True, ""
+        # Проверяем конкретную модель
         if "image_models" in tier_config and model_name in tier_config["image_models"]:
             return True, ""
         return (

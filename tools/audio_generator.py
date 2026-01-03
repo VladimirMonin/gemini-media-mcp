@@ -196,7 +196,7 @@ def generate_audio_from_yaml(
     try:
         # 0. Tier Validation (CRITICAL for Free tier: only 3 RPM!)
         # Проверяем доступность TTS на текущем tier и модели
-        is_available, error_message = validate_model_for_tier(model, "audio_tts")
+        is_available, error_message = validate_model_for_tier(model, "audio_generation")
         if not is_available:
             logger.error(f"❌ {error_message}")
             raise ValueError(error_message)
