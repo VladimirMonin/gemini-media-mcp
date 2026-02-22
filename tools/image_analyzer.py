@@ -50,6 +50,7 @@ def analyze_image(
     image_path: str,
     user_prompt: str = "",
     model_name: str | None = None,
+    media_resolution: str = "high",
     system_instruction_name: str = "default",
     system_instruction_override: str | None = None,
     system_instruction_file_path: str | None = None,
@@ -65,8 +66,13 @@ def analyze_image(
     Args:
         image_path: Absolute path to the image file on local machine.
         user_prompt: Custom analysis request (optional).
-        model_name: The Gemini model to use (e.g., "gemini-2.5-flash").
+        model_name: The Gemini model to use (e.g., "gemini-3-flash-preview").
                     Defaults to the one specified in config.py.
+        media_resolution: Разрешение обработки медиа на сервере Google ('low', 'medium', 'high').
+                    'high' — для скриншотов с мелким текстом (Pan & Scan, макс. детализация).
+                    'medium' — баланс между качеством и стоимостью.
+                    'low' — минимум токенов, подходит для простых изображений.
+                    По умолчанию 'high' — оптимально для 4K скриншотов.
         system_instruction_name: Name of predefined system instruction.
         system_instruction_override: Custom system instruction (overrides system_instruction_name).
         system_instruction_file_path: Path to file with system instruction (highest priority).
@@ -143,6 +149,7 @@ def analyze_image(
             image_path=image_path,
             system_instruction=system_instruction,
             response_schema=ImageAnalysisResponse,
+            media_resolution=media_resolution,
         )
 
         try:

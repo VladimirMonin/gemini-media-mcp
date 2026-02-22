@@ -81,7 +81,7 @@ def calculate_images_tokens(images: List[Image.Image]) -> dict:
     }
 
 
-def estimate_cost(tokens: int, model: str = "gemini-2.5-flash") -> dict:
+def estimate_cost(tokens: int, model: str = "gemini-3-flash-preview") -> dict:
     """Оценивает стоимость API на основе количества токенов.
 
     Args:
@@ -91,19 +91,20 @@ def estimate_cost(tokens: int, model: str = "gemini-2.5-flash") -> dict:
     Returns:
         Словарь с оценкой стоимости.
     """
-    # Pricing tiers (example - update with actual rates)
-    # Free tier: 1,500 requests per day, 1 million tokens per minute
+    # Цены за 1K токенов (input/output).
+    # Gemini 3 preview — бесплатно на данный момент, указаны ожидаемые тарифы.
+    # Источник: https://ai.google.dev/pricing
     pricing = {
-        "gemini-2.5-flash-lite": {
-            "input": 0.00001875,
-            "output": 0.000075,
-        },  # per 1K tokens
+        "gemini-3.1-pro-preview": {"input": 0.00125, "output": 0.005},
+        "gemini-3-flash-preview": {"input": 0.00001875, "output": 0.000075},
+        "gemini-3-pro-preview": {"input": 0.00125, "output": 0.005},
+        "gemini-2.5-flash-lite": {"input": 0.00001875, "output": 0.000075},
         "gemini-2.5-flash": {"input": 0.00001875, "output": 0.000075},
         "gemini-2.5-pro": {"input": 0.00125, "output": 0.005},
         "gemini-2.0-flash": {"input": 0.00001875, "output": 0.000075},
     }
 
-    rates = pricing.get(model, pricing["gemini-2.5-flash"])
+    rates = pricing.get(model, pricing["gemini-3-flash-preview"])
     input_cost = (tokens / 1000) * rates["input"]
 
     return {

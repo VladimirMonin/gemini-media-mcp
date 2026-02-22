@@ -20,10 +20,16 @@ from PIL import Image
 from google.genai import types, Client
 
 from config import GEMINI_API_KEY, DEFAULT_GEMINI_MODEL
-from models.analysis import ImageAnalysisResponse, ErrorResponse
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Маппинг строковых значений media_resolution на enum Google API
+_MEDIA_RESOLUTION_MAP = {
+    "low": types.MediaResolution.MEDIA_RESOLUTION_LOW,
+    "medium": types.MediaResolution.MEDIA_RESOLUTION_MEDIUM,
+    "high": types.MediaResolution.MEDIA_RESOLUTION_HIGH,
+}
 
 
 class GeminiClient:
@@ -40,6 +46,31 @@ class GeminiClient:
         self.client = Client(api_key=GEMINI_API_KEY)
         logger.info(f"🔧 Инициализирован GeminiClient: {model_name}")
 
+    @staticmethod
+    def _resolve_media_resolution(
+        value: Optional[str],
+    ) -> Optional[types.MediaResolution]:
+        """Преобразует строковое значение media_resolution в enum Google API.
+
+        Args:
+            value: Строковое значение ('low', 'medium', 'high') или None.
+
+        Returns:
+            Enum types.MediaResolution или None.
+
+        Raises:
+            ValueError: Если передано неизвестное значение.
+        """
+        if value is None:
+            return None
+        resolved = _MEDIA_RESOLUTION_MAP.get(value.lower())
+        if resolved is None:
+            raise ValueError(
+                f"Unknown media_resolution '{value}'. "
+                f"Available: {list(_MEDIA_RESOLUTION_MAP.keys())}"
+            )
+        return resolved
+
     def generate_content(
         self,
         prompt: str,
@@ -48,6 +79,7 @@ class GeminiClient:
         mime_type: Optional[str] = None,
         system_instruction: Optional[str] = None,
         response_schema=None,
+        media_resolution: Optional[str] = None,
     ) -> str:
         """Генерирует контент с медиа через Gemini API.
 
@@ -58,6 +90,9 @@ class GeminiClient:
             mime_type: MIME-тип медиа.
             system_instruction: Системная инструкция.
             response_schema: Pydantic модель для структурированного ответа.
+            media_resolution: Разрешение обработки медиа ('low', 'medium', 'high').
+                Влияет на количество токенов для изображений.
+                'high' рекомендуется для скриншотов с мелким текстом.
 
         Returns:
             Текстовый ответ модели.
@@ -105,6 +140,11 @@ class GeminiClient:
                 # Pass Pydantic model directly - library handles conversion
                 config_params["response_schema"] = response_schema
 
+            resolved_resolution = self._resolve_media_resolution(media_resolution)
+            if resolved_resolution:
+                config_params["media_resolution"] = resolved_resolution
+                logger.info(f"📐 Media resolution: {media_resolution}")
+
             config = types.GenerateContentConfig(**config_params)
 
             logger.info("🚀 Отправка запроса на генерацию в Gemini")
@@ -145,6 +185,7 @@ class GeminiClient:
         response_schema=None,
         temperature: float = 0.7,
         max_output_tokens: int = 4096,
+        media_resolution: Optional[str] = None,
     ) -> str:
         """Генерирует контент с несколькими изображениями.
 
@@ -155,6 +196,7 @@ class GeminiClient:
             response_schema: Pydantic модель для структурированного ответа.
             temperature: Температура генерации (0.0-2.0).
             max_output_tokens: Максимум токенов в ответе.
+            media_resolution: Разрешение обработки медиа ('low', 'medium', 'high').
 
         Returns:
             Текстовый ответ модели.
@@ -213,9 +255,17 @@ class GeminiClient:
                 config_params["response_mime_type"] = "application/json"
                 config_params["response_schema"] = response_schema
 
+            resolved_resolution = self._resolve_media_resolution(media_resolution)
+            if resolved_resolution:
+                config_params["media_resolution"] = resolved_resolution
+                logger.info(f"📐 Media resolution: {media_resolution}")
+
             config = types.GenerateContentConfig(**config_params)
 
-            logger.info(f"🚀 Отправка {len(images)} изображений в Gemini ({self.model_name})")
+            logger.info(
+                f"🚀 Отправка {len(images)} изображений в Gemini ({self.model_name})"
+            )
+            logger.info(f"📐 Медиа-разрешение: {media_resolution or 'default'}")
             response = self.client.models.generate_content(
                 model=self.model_name, contents=content_parts, config=config
             )

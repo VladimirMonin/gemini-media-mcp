@@ -18,10 +18,14 @@
 
 ### Model Support
 
-- ✅ **Gemini 2.5 Flash Lite**: Fast and efficient (default)
+- ✅ **Gemini 3 Flash Preview**: New default for analysis (fast, capable)
+- ✅ **Gemini 3.1 Pro Preview**: Latest pro model
+- ✅ **Gemini 3 Pro Preview**: Pro quality
+- ✅ **Gemini 2.5 Flash Lite**: Cheapest model (good for tests)
 - ✅ **Gemini 2.5 Flash**: Balanced performance
-- ✅ **Gemini 2.5 Pro**: Highest quality
+- ✅ **Gemini 2.5 Pro**: High quality
 - ✅ **Model Selection**: Per-request model override support
+- ✅ **media_resolution**: Server-side image token control (high/medium/low)
 
 ### Documentation
 
@@ -62,6 +66,15 @@ Comprehensive documentation is available in both English and Russian, including:
 - Detailed usage instructions
 - Troubleshooting and common issues
 - Complete memory bank for project continuity
+
+### Recent Milestones (February 2026)
+
+1. **Gemini 3 Models**: Added gemini-3-flash-preview (default), gemini-3.1-pro-preview, gemini-3-pro-preview
+2. **media_resolution API**: Server-side image resolution control (high/medium/low) — no client resize needed
+3. **TTS Queue Disabled**: queue_generate_audio disabled (Batch API returns 404 for TTS models)
+4. **Integration Tests**: New test_recognition.py with 17 tests (real API, cat.jpg, audio)
+5. **GIF Analyzer Fix**: Fixed async def bug (was blocking event loop)
+6. **Pricing Update**: image_tokens.py updated with Gemini 3 model pricing
 
 ### Recent Milestones (October 2025)
 

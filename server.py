@@ -45,7 +45,9 @@ try:
     from tools.video_analyzer import analyze_video
     from tools.batch_tools import (
         batch_generate_images,
-        queue_generate_audio,
+        # TODO: queue_generate_audio отключен — Batch API не поддерживает TTS модели (404 NOT_FOUND).
+        # Когда Google добавит поддержку — раскомментировать.
+        # queue_generate_audio,
         check_task_status,
         check_batch_progress,
     )
@@ -79,10 +81,11 @@ mcp.tool()(analyze_video)
 
 # Регистрация batch/queue инструментов
 mcp.tool()(batch_generate_images)
-mcp.tool()(queue_generate_audio)
+# TODO: queue_generate_audio отключен — TTS не работает через Batch API
+# mcp.tool()(queue_generate_audio)
 mcp.tool()(check_task_status)
 mcp.tool()(check_batch_progress)
-logger.info("✅ Batch инструменты зарегистрированы")
+logger.info("✅ Batch инструменты зарегистрированы (⚠️ queue_generate_audio отключен)")
 
 if __name__ == "__main__":
     try:

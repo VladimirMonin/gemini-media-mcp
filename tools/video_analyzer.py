@@ -16,6 +16,7 @@ from config import (
     DEFAULT_GEMINI_MODEL,
     GEMINI_API_KEY,
 )
+from utils.gemini_client import GeminiClient
 from models.analysis import VideoAnalysisResponse, ErrorResponse
 from utils.media_frame_extractor import extract_frames
 from utils.audio_extractor import extract_audio_from_video, estimate_audio_size
@@ -62,6 +63,7 @@ def analyze_video(
     dry_run: bool = False,
     # Model selection
     model_name: str = DEFAULT_GEMINI_MODEL,
+    media_resolution: str = "low",
 ) -> str:
     """Analyze video as frames + audio in one multimodal request.
 
@@ -87,6 +89,8 @@ def analyze_video(
         audio_bitrate: Audio bitrate in kbps (64/32/24, default: 64)
         dry_run: If True, only estimate size without processing (default: False)
         model_name: Gemini model to use (default from config)
+        media_resolution: Разрешение обработки медиа на сервере ('low', 'medium', 'high').
+                    Для видео-кадров по умолчанию 'low' — экономия токенов.
 
     Returns:
         JSON string with VideoAnalysisResponse or dry-run estimation
@@ -204,15 +208,22 @@ def analyze_video(
         logger.info(f"🚀 Sending to Gemini API (model={model_name})...")
         client = genai.Client(api_key=GEMINI_API_KEY)
 
+        # Преобразуем media_resolution через GeminiClient helper
+        resolved_resolution = GeminiClient._resolve_media_resolution(media_resolution)
+        config_params = {
+            "system_instruction": DEFAULT_VIDEO_SYSTEM_PROMPT,
+            "temperature": 0.4,
+            "response_mime_type": "application/json",
+            "response_schema": VideoAnalysisResponse,
+        }
+        if resolved_resolution:
+            config_params["media_resolution"] = resolved_resolution
+            logger.info(f"📐 Media resolution: {media_resolution}")
+
         response = client.models.generate_content(
             model=model_name,
             contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=DEFAULT_VIDEO_SYSTEM_PROMPT,
-                temperature=0.4,
-                response_mime_type="application/json",
-                response_schema=VideoAnalysisResponse,
-            ),
+            config=types.GenerateContentConfig(**config_params),
         )
 
         # Step 6: Parse response

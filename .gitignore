@@ -11,3 +11,4 @@ media/generated/
 docs/.DS_Store
 .DS_Store
 tasks.db
+.mypy_cache*

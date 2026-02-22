@@ -59,10 +59,27 @@ python server.py
 
 ### Supported Models
 
-- `gemini-2.5-flash-lite` - Default, fast and efficient
+- `gemini-3-flash-preview` - Default for analysis, fast and capable (Gemini 3)
+- `gemini-3.1-pro-preview` - Latest pro model (Gemini 3.1)
+- `gemini-3-pro-preview` - Pro quality (Gemini 3)
+- `gemini-2.5-flash-lite` - Cheapest, good for tests
 - `gemini-2.5-flash` - Balanced performance
-- `gemini-2.5-pro` - Highest quality
+- `gemini-2.5-pro` - High quality (Gemini 2.5)
 - `gemini-2.5-flash-image-preview` - Image generation model
+
+### media_resolution API Parameter
+
+Server-side image token control via `types.MediaResolution`:
+
+- `high` — Pan & Scan tiling, max detail (default for image analysis, 4K screenshots)
+- `medium` — balanced quality/cost (default for GIF analysis)
+- `low` — minimal tokens (default for video frames)
+
+### Batch API Status
+
+- ✅ Image generation batch — works (gemini-2.5-flash-image, gemini-3-pro-image-preview)
+- ✅ Text/multimodal batch — works (gemini-3-flash-preview, gemini-2.5-flash)
+- ❌ TTS batch — NOT supported (returns 404 NOT_FOUND), queue_generate_audio disabled
 
 ### File Format Support
 
@@ -77,11 +94,13 @@ python server.py
 - Maximum file size: 19.5 MB
 
 #### Video (planned)
+
 - Support for common video formats
 - Two-phase approach: MVP with inline_data (≤20MB), then File API (up to 2GB)
 - Structured response with events, transcription, and file_uri for reuse
 
 #### Web Search (planned)
+
 - Internet search using Google Search API
 - Structured responses with sources and search queries
 - Integration with Gemini API for search grounding
@@ -120,6 +139,7 @@ analyze_image(
     image_path: str,
     user_prompt: str = "",
     model_name: Optional[str] = None,
+    media_resolution: str = "high",
     system_instruction_name: str = "default",
     system_instruction_override: Optional[str] = None,
     system_instruction_file_path: Optional[str] = None

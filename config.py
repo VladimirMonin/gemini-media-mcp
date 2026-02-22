@@ -68,7 +68,7 @@ def get_tier() -> str:
 
     Returns:
         str: Tier пользователя (по умолчанию 'tier1')
-        
+
     Note:
         По умолчанию используется 'tier1', т.к. бесплатный tier от Google
         сильно ограничен. Если нужно явно использовать free tier - укажите
@@ -100,6 +100,8 @@ TIER_RATE_LIMITS = {
     },
     "tier1": {
         "text_models": {
+            "gemini-3.1-pro-preview": {"rpm": 50, "tpm": 1000000, "rpd": 1000},
+            "gemini-3-flash-preview": {"rpm": 1000, "tpm": 4000000, "rpd": 10000},
             "gemini-3-pro-preview": {"rpm": 50, "tpm": 1000000, "rpd": 1000},
             "gemini-2.5-pro": {"rpm": 150, "tpm": 2000000, "rpd": 10000},
             "gemini-2.5-flash": {"rpm": 1000, "tpm": 1000000, "rpd": 10000},
@@ -119,12 +121,14 @@ TIER_RATE_LIMITS = {
 
 
 # Маппинг типов операций на модели Gemini для Batch API
+# Batch API поддерживает: gemini-3-flash-preview, gemini-2.5-flash, Nano Banana (image gen)
+# Batch API НЕ поддерживает: TTS модели (возвращают 404 NOT_FOUND)
 BATCH_MODEL_MAPPING = {
     "IMG_GEN_BATCH": "__use_image_gen_models__",
-    "IMG_ANALYZE_BATCH": "gemini-2.5-flash",
-    "VIDEO_ANALYZE_BATCH": "gemini-2.5-flash",
-    "GIF_ANALYZE_BATCH": "gemini-2.5-flash",
-    "TEXT_GEN_BATCH": "gemini-2.5-flash",
+    "IMG_ANALYZE_BATCH": "gemini-3-flash-preview",
+    "VIDEO_ANALYZE_BATCH": "gemini-3-flash-preview",
+    "GIF_ANALYZE_BATCH": "gemini-3-flash-preview",
+    "TEXT_GEN_BATCH": "gemini-3-flash-preview",
 }
 
 
@@ -288,9 +292,11 @@ GEMINI_MODELS = [
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
     "gemini-2.5-pro",
-    "gemini-3-pro-preview",  # Доступна только на tier1
+    "gemini-3-flash-preview",
+    "gemini-3-pro-preview",
+    "gemini-3.1-pro-preview",
 ]
-DEFAULT_GEMINI_MODEL: str = GEMINI_MODELS[0]
+DEFAULT_GEMINI_MODEL: str = "gemini-3-flash-preview"
 
 DEFAULT_IMAGE_ANALYSIS_SYSTEM_PROMPT: str = """
 You are an expert image analyst. Your task is to provide accurate and detailed image descriptions based on user requests.
@@ -490,7 +496,7 @@ GIF_QUALITY_PRESETS = {
 }
 
 DEFAULT_GIF_QUALITY = "fhd"
-DEFAULT_GIF_MODEL = "gemini-2.5-flash"
+DEFAULT_GIF_MODEL = "gemini-3-flash-preview"
 
 DEFAULT_GIF_ANALYSIS_SYSTEM_PROMPT: str = """
 You are analyzing an animated sequence extracted from a GIF file.
@@ -590,7 +596,7 @@ VIDEO_QUALITY_PRESETS = {
 }
 
 DEFAULT_VIDEO_QUALITY = "fhd"
-DEFAULT_VIDEO_MODEL = "gemini-2.5-flash"
+DEFAULT_VIDEO_MODEL = "gemini-3-flash-preview"
 
 SUPPORTED_VIDEO_FORMATS = {
     "video/mp4": "MP4",

@@ -22,7 +22,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-async def analyze_gif(
+def analyze_gif(
     image_path: str,
     prompt: str = "Analyze this animation and describe what it demonstrates",
     mode: Literal["fps", "total", "interval"] = "total",
@@ -31,6 +31,7 @@ async def analyze_gif(
     interval_sec: Optional[float] = None,
     quality: Literal["uhd", "fhd", "hd", "balanced", "economy"] = DEFAULT_GIF_QUALITY,
     model: str = DEFAULT_GIF_MODEL,
+    media_resolution: str = "medium",
 ) -> dict:
     """Analyze GIF animation using Gemini AI.
 
@@ -64,7 +65,9 @@ async def analyze_gif(
                 - 'balanced' (960px): Budget-friendly for long sessions
                 - 'economy' (768px): Minimal quality, lowest cost
                 - 'uhd' (original): Maximum detail, highest cost
-        model: Gemini model to use (default: 'gemini-2.5-flash')
+        model: Gemini model to use (default: 'gemini-3-flash-preview')
+        media_resolution: Разрешение обработки медиа ('low', 'medium', 'high').
+                    Для GIF по умолчанию 'medium' — баланс между качеством и токенами.
 
     Returns:
         dict: {
@@ -183,6 +186,7 @@ async def analyze_gif(
             prompt=enhanced_prompt,
             images=processed_frames,  # List of PIL Images
             temperature=0.7,
+            media_resolution=media_resolution,
         )
 
         logger.info(f"✅ Analysis completed successfully for {image_path}")
@@ -223,7 +227,7 @@ async def analyze_gif(
         }
 
 
-async def get_gif_guidelines() -> str:
+def get_gif_guidelines() -> str:
     """Get comprehensive guidelines for GIF animation analysis.
 
     Returns best practices, quality recommendations, cost estimates,
